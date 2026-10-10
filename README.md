@@ -62,6 +62,13 @@ datasource and dashboard provider from `grafana/provisioning/`, copy
 `/etc/grafana/faa-clickhouse.env`, and restart Grafana. The datasource is
 "ClickHouse FAA" (uid `clickhouse-faa`); being provisioned, it is read-only in the UI.
 
+Dashboards (folder "FAA"):
+
+| Dashboard | Shows |
+|-----------|-------|
+| [Flight Delays](http://kolcheck:3000/d/faa-flight-delays) | On-time %, delays and cancellations over time, delay causes, airlines, hour/weekday patterns, airport map |
+| [Aircraft Reliability](http://kolcheck:3000/d/faa-aircraft-reliability) | Per tail number: carrier-caused cancellations and delays, utilisation, out-of-service gaps; drill into one aircraft's history |
+
 To add a dashboard: build it in Grafana, export it as JSON (Share > Export), save it in
 `grafana/dashboards/`, commit, and re-run the script.
 
