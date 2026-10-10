@@ -1,4 +1,4 @@
-package com.srmadscience.faadata;
+package ie.rolfe.faadata;
 
 import java.io.IOException;
 import java.io.InputStream;
