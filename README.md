@@ -21,7 +21,7 @@ A ClickHouse / Grafana application that uses publicly available FAA flight and w
 To join flights to weather, go through `faa.airport_station`: `ontime.Origin = airport`,
 `weather.station = station`. Station ids differ from BTS codes outside the lower 48
 (FAI → PAFA, SJU → TJSJ), and `sql/35_airport_aliases.sql` covers re-coded airports
-(PBI → DJT). Saipan (SPN) has no IEM station.
+(PBI → DJT) and closed ones (ISN, Williston, closed 2019). Saipan (SPN) has no IEM station.
 
 Flights join to aircraft on `ontime.tail = aircraft_info.tail` (99.9% of 2025 tail numbers
 match; aircraft retired since come from the deregistration file). Owner street addresses
