@@ -1,7 +1,6 @@
-# Requires the plugin: grafana-cli plugins install grafana-clickhouse-datasource
-# Grafana runs on kolcheck (10.13.1.142:3000). Either copy this file to
-# /etc/grafana/provisioning/datasources/ on kolcheck, or run scripts/grafana-datasource.sh.
-# If copying, set CLICKHOUSE_USER / CLICKHOUSE_PASSWORD in Grafana's environment (e.g. /etc/default/grafana-server).
+# Installed on kolcheck by scripts/grafana-provision.sh, which also supplies
+# CLICKHOUSE_USER / CLICKHOUSE_PASSWORD to grafana-server's environment.
+# Requires the grafana-clickhouse-datasource plugin (4.x).
 apiVersion: 1
 datasources:
   - name: ClickHouse FAA

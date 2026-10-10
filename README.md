@@ -24,7 +24,7 @@ To join flights to weather, go through `faa.airport_station`: `ontime.Origin = a
 
     src/main/java/...      Loader: ping | schema | load (streams CSV / .gz / .zip)
     sql/                   Table definitions, run in file-name order
-    scripts/               Everything needed to rebuild the database (below)
+    scripts/               Everything needed to rebuild the database and Grafana (below)
     grafana/provisioning/  Datasource + dashboard provider config
     grafana/dashboards/    Exported dashboard JSON (committed)
     data/                  Downloaded data: NOT in git (see data/README.md)
@@ -51,10 +51,19 @@ To add more data later, run `reproduce.sh` with a wider range: existing download
 
 ## Grafana
 
-Grafana (kolcheck) queries ClickHouse (xraytunnel:9000) directly. To set up the datasource,
-create a service account token in Grafana (Administration > Service accounts, Admin role), then:
+Grafana runs on kolcheck (http://kolcheck:3000) and queries ClickHouse (xraytunnel:9000)
+directly. Set it up, or update it after changing `grafana/`, with:
 
-    GRAFANA_TOKEN=glsa_... CLICKHOUSE_PASSWORD=... scripts/grafana-datasource.sh
+    scripts/grafana-provision.sh
+
+This uses SSH (`pi@kolcheck`, key login and passwordless sudo) to install the
+datasource and dashboard provider from `grafana/provisioning/`, copy
+`grafana/dashboards/*.json`, put the ClickHouse credentials in a root-only
+`/etc/grafana/faa-clickhouse.env`, and restart Grafana. The datasource is
+"ClickHouse FAA" (uid `clickhouse-faa`); being provisioned, it is read-only in the UI.
+
+To add a dashboard: build it in Grafana, export it as JSON (Share > Export), save it in
+`grafana/dashboards/`, commit, and re-run the script.
 
 ## Large data files
 
