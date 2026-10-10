@@ -25,11 +25,12 @@ ch_query() {
     --data-binary "$sql" "$@"
 }
 
-# ch_insert "INSERT INTO t FORMAT X" < data: stream stdin as the insert's data.
+# ch_insert "INSERT INTO t FORMAT X" [setting=value&...] < data: stream stdin
+# as the insert's data, optionally with ClickHouse settings.
 ch_insert() {
   local q
   q=$(python3 -I -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$1")
-  curl -sS --fail-with-body "$CH_URL/?query=$q" \
+  curl -sS --fail-with-body "$CH_URL/?query=$q${2:+&$2}" \
     -H "X-ClickHouse-User: $CH_USER" \
     -H "X-ClickHouse-Key: $CH_PASSWORD" \
     --data-binary @-

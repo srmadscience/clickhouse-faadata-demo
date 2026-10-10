@@ -14,11 +14,17 @@ A ClickHouse / Grafana application that uses publicly available FAA flight and w
 | `faa.weather` | [IEM ASOS](https://mesonet.agron.iastate.edu/request/download.phtml) observations | one row per METAR (roughly hourly), UTC |
 | `faa.airports` | [OurAirports](https://ourairports.com/data/) | one row per airport worldwide: codes, names, coordinates |
 | `faa.airport_station` (view) | | BTS airport code → IEM station and time zone |
+| `faa.registry_master`, `faa.registry_dereg`, `faa.registry_models` | [FAA aircraft registry](https://www.faa.gov/licenses_certificates/aircraft_certification/aircraft_registry/releasable_aircraft_download) | registered and deregistered aircraft; make/model reference |
+| `faa.aircraft` (view), `faa.aircraft_info` (snapshot) | | one row per tail number: model, year built, seats, owner, status |
 
 To join flights to weather, go through `faa.airport_station`: `ontime.Origin = airport`,
 `weather.station = station`. Station ids differ from BTS codes outside the lower 48
 (FAI → PAFA, SJU → TJSJ), and `sql/35_airport_aliases.sql` covers re-coded airports
 (PBI → DJT). Saipan (SPN) has no IEM station.
+
+Flights join to aircraft on `ontime.tail = aircraft_info.tail` (99.9% of 2025 tail numbers
+match; aircraft retired since come from the deregistration file). Owner street addresses
+are never loaded, and owner names only for organisations, not individuals.
 
 ## Layout
 
@@ -46,6 +52,7 @@ Needs bash, curl, python3, Java 21 and Maven.
 | `fetch-stations.sh` / `load-stations.sh` | Refreshes IEM stations and OurAirports; lists airports with no station |
 | `fetch-weather.sh FROM TO` | Downloads IEM observations (years) for every airport in `faa.ontime` |
 | `load-weather.sh` | Loads them; duplicates are removed by the table engine |
+| `fetch-registry.sh` / `load-registry.sh` | Downloads today's FAA registry; replaces the registry tables and `aircraft_info` |
 
 To add more data later, run `reproduce.sh` with a wider range: existing downloads are skipped.
 
@@ -67,7 +74,7 @@ Dashboards (folder "FAA"):
 | Dashboard | Shows |
 |-----------|-------|
 | [Flight Delays](http://kolcheck:3000/d/faa-flight-delays) | On-time %, delays and cancellations over time, delay causes, airlines, hour/weekday patterns, airport map |
-| [Aircraft Reliability](http://kolcheck:3000/d/faa-aircraft-reliability) | Per tail number: carrier-caused cancellations and delays, utilisation, out-of-service gaps; drill into one aircraft's history |
+| [Aircraft Reliability](http://kolcheck:3000/d/faa-aircraft-reliability) | Per tail number: carrier-caused cancellations and delays, utilisation, out-of-service gaps, reliability by model and age; drill into one aircraft's history and registration |
 
 To add a dashboard: build it in Grafana, export it as JSON (Share > Export), save it in
 `grafana/dashboards/`, commit, and re-run the script.

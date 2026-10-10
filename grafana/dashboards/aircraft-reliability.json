@@ -630,6 +630,212 @@
       "id": 9
     },
     {
+      "type": "table",
+      "title": "Reliability by aircraft model",
+      "description": "Carrier cancellations and delay by FAA make/model (10+ aircraft and 5,000+ flights, so widebodies that fly few domestic legs are left out). Model names are the FAA's exact type designations, so variants (737-8H4, 737-890...) appear separately.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-faa"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 14,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-faa"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT if(a.make_model = '', '(not in registry)', a.make_model) AS Model,\n       count() AS Aircraft,\n       sum(t.flights) AS Flights,\n       round(avg(a.year_mfr), 0) AS `Avg built`,\n       round(1000 * sum(t.cxl) / Flights, 2) AS `Cxl/1k`,\n       round(sum(t.delay) / sum(t.done), 1) AS `Delay min/flt`\nFROM (\n    SELECT tail, count() AS flights, countIf(Cancelled = 1 AND CancellationCode = 'A') AS cxl,\n           sum(CarrierDelay) AS delay, countIf(Cancelled = 0) AS done\n    FROM faa.ontime WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''\n    GROUP BY tail\n) AS t\nLEFT JOIN faa.aircraft_info AS a ON a.tail = t.tail\nGROUP BY Model HAVING Aircraft >= 10 AND Flights >= 5000\nORDER BY `Cxl/1k` DESC"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cxl/1k"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-GrYlRd"
+                }
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 12
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Delay min/flt"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-GrYlRd"
+                }
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 15
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Model"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 300
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Avg built"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "unit",
+                "value": "none"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "id": 10
+    },
+    {
+      "type": "barchart",
+      "title": "Reliability by aircraft age",
+      "description": "Aircraft age in years at the time of each flight (from the FAA registry's year of manufacture).",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-faa"
+      },
+      "gridPos": {
+        "x": 14,
+        "y": 14,
+        "w": 10,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-faa"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT multiIf(t.year - a.year_mfr < 5, '0-4', t.year - a.year_mfr < 10, '5-9',\n               t.year - a.year_mfr < 15, '10-14', t.year - a.year_mfr < 20, '15-19',\n               t.year - a.year_mfr < 25, '20-24', '25+') AS bucket,\n       round(1000 * sum(t.cxl) / sum(t.flights), 2) AS `Carrier cxl / 1k flights`,\n       round(sum(t.delay) / sum(t.done), 1) AS `Carrier delay min / flight`,\n       uniqExact(t.tail) AS aircraft\nFROM (\n    SELECT tail, toYear(FlightDate) AS year, countIf(Cancelled = 1 AND CancellationCode = 'A') AS cxl, count() AS flights,\n           sum(CarrierDelay) AS delay, countIf(Cancelled = 0) AS done\n    FROM faa.ontime WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''\n    GROUP BY tail, year\n) AS t\nINNER JOIN faa.aircraft_info AS a ON a.tail = t.tail\nWHERE a.year_mfr IS NOT NULL\nGROUP BY bucket ORDER BY min(t.year - a.year_mfr)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 0
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Carrier delay min / flight"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "m"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "aircraft"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "viz": true,
+                  "legend": true,
+                  "tooltip": false
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "xField": "bucket",
+        "showValue": "never",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 11
+    },
+    {
       "type": "timeseries",
       "title": "Carrier cancellations by day",
       "description": "Carrier-caused (code A) cancellations per day, including flights with no tail number. Weather and air-traffic cancellations are left out: they are not the fleet's fault and their storm spikes are 100x larger (see the Flight Delays dashboard).",
@@ -639,7 +845,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 14,
+        "y": 23,
         "w": 24,
         "h": 8
       },
@@ -718,7 +924,7 @@
           "mode": "multi"
         }
       },
-      "id": 10
+      "id": 12
     },
     {
       "type": "table",
@@ -730,7 +936,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 22,
+        "y": 31,
         "w": 24,
         "h": 11
       },
@@ -744,7 +950,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT tail AS Tail, any(Reporting_Airline) AS Airline,\n       count() AS Flights,\n       countIf(Cancelled = 1 AND CancellationCode = 'A') AS `Cxl`,\n       round(1000 * Cxl / Flights, 1) AS `Cxl/1k`,\n       round(sum(CarrierDelay) / countIf(Cancelled = 0), 1) AS `Delay min/flt`,\n       countIf(Diverted = 1) AS Diverted,\n       uniqExact(FlightDate) AS `Days flown`,\n       arrayMax(arrayDifference(arraySort(groupUniqArray(toRelativeDayNum(FlightDate))))) - 1\n           AS `Longest gap`,\n       toString(max(FlightDate)) AS `Last flown`\nFROM faa.ontime WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''\nGROUP BY tail HAVING Flights >= ${min_flights}\nORDER BY `Cxl/1k` DESC, `Delay min/flt` DESC\nLIMIT 100"
+          "rawSql": "SELECT t.Tail, t.Airline, a.make_model AS Model, a.year_mfr AS Built, t.* EXCEPT (Tail, Airline)\nFROM (\n    SELECT tail AS Tail, any(Reporting_Airline) AS Airline,\n           count() AS Flights,\n           countIf(Cancelled = 1 AND CancellationCode = 'A') AS `Cxl`,\n           round(1000 * Cxl / Flights, 1) AS `Cxl/1k`,\n           round(sum(CarrierDelay) / countIf(Cancelled = 0), 1) AS `Delay min/flt`,\n           countIf(Diverted = 1) AS Diverted,\n           uniqExact(FlightDate) AS `Days flown`,\n           arrayMax(arrayDifference(arraySort(groupUniqArray(toRelativeDayNum(FlightDate))))) - 1\n               AS `Longest gap`,\n           toString(max(FlightDate)) AS `Last flown`\n    FROM faa.ontime WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''\n    GROUP BY tail HAVING Flights >= ${min_flights}\n    ORDER BY `Cxl/1k` DESC, `Delay min/flt` DESC\n    LIMIT 100\n) AS t\nLEFT JOIN faa.aircraft_info AS a ON a.tail = t.Tail\nORDER BY `Cxl/1k` DESC, `Delay min/flt` DESC"
         }
       ],
       "fieldConfig": {
@@ -843,6 +1049,30 @@
           {
             "matcher": {
               "id": "byName",
+              "options": "Model"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 260
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Built"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
               "options": "Tail"
             },
             "properties": [
@@ -863,7 +1093,7 @@
         "showHeader": true,
         "cellHeight": "sm"
       },
-      "id": 11
+      "id": 13
     },
     {
       "type": "row",
@@ -871,12 +1101,66 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 33,
+        "y": 42,
         "w": 24,
         "h": 1
       },
       "panels": [],
-      "id": 12
+      "id": 14
+    },
+    {
+      "type": "table",
+      "title": "Registration",
+      "description": "From the FAA aircraft registry. Owner is often a lessor rather than the operating airline.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-faa"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 43,
+        "w": 24,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-faa"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT make_model AS Model, year_mfr AS Built, seats AS Seats,\n       if(registrant = '', '(not published)', registrant) AS Owner,\n       if(registered = 1, 'Registered', concat('Deregistered ', toString(cancel_date))) AS Status\nFROM faa.aircraft_info WHERE tail = '${tail}'"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Built"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "id": 15
     },
     {
       "type": "stat",
@@ -888,7 +1172,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 34,
+        "y": 46,
         "w": 4,
         "h": 4
       },
@@ -937,7 +1221,7 @@
         "textMode": "value",
         "justifyMode": "center"
       },
-      "id": 13
+      "id": 16
     },
     {
       "type": "stat",
@@ -949,7 +1233,7 @@
       },
       "gridPos": {
         "x": 4,
-        "y": 34,
+        "y": 46,
         "w": 4,
         "h": 4
       },
@@ -1006,7 +1290,7 @@
         "textMode": "value",
         "justifyMode": "center"
       },
-      "id": 14
+      "id": 17
     },
     {
       "type": "stat",
@@ -1018,7 +1302,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 34,
+        "y": 46,
         "w": 4,
         "h": 4
       },
@@ -1067,7 +1351,7 @@
         "textMode": "value",
         "justifyMode": "center"
       },
-      "id": 15
+      "id": 18
     },
     {
       "type": "stat",
@@ -1079,7 +1363,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 34,
+        "y": 46,
         "w": 4,
         "h": 4
       },
@@ -1128,7 +1412,7 @@
         "textMode": "value",
         "justifyMode": "center"
       },
-      "id": 16
+      "id": 19
     },
     {
       "type": "stat",
@@ -1140,7 +1424,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 34,
+        "y": 46,
         "w": 4,
         "h": 4
       },
@@ -1189,7 +1473,7 @@
         "textMode": "value",
         "justifyMode": "center"
       },
-      "id": 17
+      "id": 20
     },
     {
       "type": "stat",
@@ -1201,7 +1485,7 @@
       },
       "gridPos": {
         "x": 20,
-        "y": 34,
+        "y": 46,
         "w": 4,
         "h": 4
       },
@@ -1250,7 +1534,7 @@
         "textMode": "value",
         "justifyMode": "center"
       },
-      "id": 18
+      "id": 21
     },
     {
       "type": "timeseries",
@@ -1262,7 +1546,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 38,
+        "y": 50,
         "w": 24,
         "h": 8
       },
@@ -1348,7 +1632,7 @@
           "mode": "multi"
         }
       },
-      "id": 19
+      "id": 22
     },
     {
       "type": "table",
@@ -1360,7 +1644,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 46,
+        "y": 58,
         "w": 24,
         "h": 11
       },
@@ -1414,7 +1698,7 @@
         "showHeader": true,
         "cellHeight": "sm"
       },
-      "id": 20
+      "id": 23
     }
   ],
   "schemaVersion": 41,
