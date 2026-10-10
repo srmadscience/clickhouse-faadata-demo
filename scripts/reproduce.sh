@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Rebuilds everything from scratch, in order: schema, flights, stations, weather,
-# aircraft registry.
+# flights joined to weather, aircraft registry.
 # Every step is idempotent, so this is also the way to extend the date range.
 #
 #   scripts/reproduce.sh 2025-01 2025-12
@@ -16,5 +16,6 @@ cd "$(dirname "$0")"
 ./load-stations.sh
 ./fetch-weather.sh "${1%-*}" "${2%-*}"
 ./load-weather.sh
+./build-flight-weather.sh
 ./fetch-registry.sh
 ./load-registry.sh
