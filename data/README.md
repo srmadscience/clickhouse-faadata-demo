@@ -10,11 +10,11 @@ re-creates this directory.
 | `raw/flights/ontime_YYYY_MM.zip` | BTS Reporting Carrier On-Time Performance, one zip per month | `scripts/fetch-flights.sh` |
 | `raw/stations/XX_ASOS.geojson` | IEM ASOS station metadata, one file per state network | `scripts/fetch-stations.sh` |
 | `raw/stations/ourairports.csv` | OurAirports airport list (IATA/ICAO/FAA codes) | `scripts/fetch-stations.sh` |
-| `raw/weather/YYYY/STATION.csv` | IEM ASOS observations, one file per airport per year | `scripts/fetch-weather.sh` |
+| `raw/weather/YYYY/STATION.csv.gz` | IEM ASOS observations, one gzipped file per airport per year | `scripts/fetch-weather.sh` |
 | `raw/registry/ReleasableAircraft_YYYYMMDD.zip` | FAA aircraft registry, one zip per download date | `scripts/fetch-registry.sh` |
 
-Rough sizes: flights ~30 MB zipped (~600k rows) per month; weather ~2.5 MB
-(~10k rows) per airport per year, ~350 airports.
+Rough sizes: flights ~30 MB zipped (~600k rows) per month; weather ~0.4 MB
+gzipped (~10k rows) per airport per year, ~350 airports a year.
 
 To pin down exactly what was loaded:
 
