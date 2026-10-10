@@ -1,0 +1,10 @@
+# Loads every dashboard JSON in grafana/dashboards/. Export dashboards from the
+# Grafana UI (Share > Export > "Export for sharing externally") and commit them there.
+apiVersion: 1
+providers:
+  - name: faa
+    folder: FAA
+    type: file
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/faa

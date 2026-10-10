@@ -1,0 +1,3 @@
+-- Run with:  java -jar target/clickhouse-faadata-demo-*-all.jar schema sql/*.sql
+-- Files run in name order; add tables as 10_flights.sql, 20_weather.sql, ...
+CREATE DATABASE IF NOT EXISTS faa;

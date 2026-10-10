@@ -1,0 +1,6 @@
+# Copy to clickhouse.properties (git-ignored) and fill in.
+# Environment variables CLICKHOUSE_URL / _USER / _PASSWORD / _DATABASE override these.
+clickhouse.url=http://xraytunnel:8123
+clickhouse.user=default
+clickhouse.password=
+clickhouse.database=faa
