@@ -89,7 +89,7 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "clickhouse-faa"
         },
-        "query": "SELECT DISTINCT tail FROM faa.ontime WHERE Reporting_Airline IN (${airline:singlequote}) AND match(tail, '^N[1-9][0-9A-Z]{0,4}$') ORDER BY 1",
+        "query": "SELECT DISTINCT tail FROM faa.tail_day WHERE Reporting_Airline IN (${airline:singlequote}) AND match(tail, '^N[1-9][0-9A-Z]{0,4}$') ORDER BY 1",
         "definition": "tail numbers for the selected airlines",
         "refresh": 2,
         "multi": false,
@@ -146,7 +146,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT uniqExact(tail) FROM faa.ontime WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''"
+          "rawSql": "SELECT uniqExact(tail) FROM faa.tail_day WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''"
         }
       ],
       "fieldConfig": {
@@ -207,7 +207,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT count() / uniqExact((tail, FlightDate)) FROM faa.ontime WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''"
+          "rawSql": "SELECT sum(flights) / count() FROM faa.tail_day WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''"
         }
       ],
       "fieldConfig": {
@@ -268,7 +268,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT countIf(Cancelled = 1 AND CancellationCode = 'A') FROM faa.ontime WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''"
+          "rawSql": "SELECT sum(cxl_carrier) FROM faa.tail_day WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''"
         }
       ],
       "fieldConfig": {
@@ -329,7 +329,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT 1000 * countIf(Cancelled = 1 AND CancellationCode = 'A') / count() FROM faa.ontime WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''"
+          "rawSql": "SELECT 1000 * sum(cxl_carrier) / sum(flights) FROM faa.tail_day WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''"
         }
       ],
       "fieldConfig": {
@@ -390,7 +390,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT sum(CarrierDelay) / countIf(Cancelled = 0) FROM faa.ontime WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''"
+          "rawSql": "SELECT sum(carrier_delay) / sum(completed) FROM faa.tail_day WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''"
         }
       ],
       "fieldConfig": {
@@ -451,7 +451,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT countIf(tail = '' AND Cancelled = 1)\nFROM faa.ontime WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote})"
+          "rawSql": "SELECT sum(cxl_carrier + cxl_other)\nFROM faa.tail_day WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail = ''"
         }
       ],
       "fieldConfig": {
@@ -512,7 +512,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT Reporting_Airline AS Airline,\n       uniqExact(tail) AS Aircraft,\n       round(count() / uniqExact((tail, FlightDate)), 1) AS `Flts/day`,\n       round(1000 * countIf(Cancelled = 1 AND CancellationCode = 'A') / count(), 2) AS `Cxl/1k`,\n       round(sum(CarrierDelay) / countIf(Cancelled = 0), 1) AS `Delay min/flt`,\n       round(100 * countIf(CarrierDelay >= 15) / countIf(Cancelled = 0), 1) AS `Delayed 15+ %`\nFROM faa.ontime WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''\nGROUP BY Airline ORDER BY `Cxl/1k`"
+          "rawSql": "SELECT Reporting_Airline AS Airline,\n       uniqExact(tail) AS Aircraft,\n       round(sum(flights) / count(), 1) AS `Flts/day`,\n       round(1000 * sum(cxl_carrier) / sum(flights), 2) AS `Cxl/1k`,\n       round(sum(carrier_delay) / sum(completed), 1) AS `Delay min/flt`,\n       round(100 * sum(delayed15) / sum(completed), 1) AS `Delayed 15+ %`\nFROM faa.tail_day WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''\nGROUP BY Airline ORDER BY `Cxl/1k`"
         }
       ],
       "fieldConfig": {
@@ -608,7 +608,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT bucket, count() AS Aircraft FROM (\n    SELECT tail,\n           1000 * countIf(Cancelled = 1 AND CancellationCode = 'A') / count() AS rate,\n           multiIf(rate = 0, '0', rate < 1, '<1', rate < 2, '1-2', rate < 3, '2-3', rate < 5, '3-5',\n                   rate < 10, '5-10', '10+') AS bucket,\n           indexOf(['0','<1','1-2','2-3','3-5','5-10','10+'], bucket) AS ord\n    FROM faa.ontime WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''\n    GROUP BY tail HAVING count() >= ${min_flights}\n)\nGROUP BY bucket, ord ORDER BY ord"
+          "rawSql": "SELECT bucket, count() AS Aircraft FROM (\n    SELECT tail,\n           1000 * sum(cxl_carrier) / sum(flights) AS rate,\n           multiIf(rate = 0, '0', rate < 1, '<1', rate < 2, '1-2', rate < 3, '2-3', rate < 5, '3-5',\n                   rate < 10, '5-10', '10+') AS bucket,\n           indexOf(['0','<1','1-2','2-3','3-5','5-10','10+'], bucket) AS ord\n    FROM faa.tail_day WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''\n    GROUP BY tail HAVING sum(flights) >= ${min_flights}\n)\nGROUP BY bucket, ord ORDER BY ord"
         }
       ],
       "fieldConfig": {
@@ -653,7 +653,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT if(a.make_model = '', '(not in registry)', a.make_model) AS Model,\n       count() AS Aircraft,\n       sum(t.flights) AS Flights,\n       round(avg(a.year_mfr), 0) AS `Avg built`,\n       round(1000 * sum(t.cxl) / Flights, 2) AS `Cxl/1k`,\n       round(sum(t.delay) / sum(t.done), 1) AS `Delay min/flt`\nFROM (\n    SELECT tail, count() AS flights, countIf(Cancelled = 1 AND CancellationCode = 'A') AS cxl,\n           sum(CarrierDelay) AS delay, countIf(Cancelled = 0) AS done\n    FROM faa.ontime WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''\n    GROUP BY tail\n) AS t\nLEFT JOIN faa.aircraft_info AS a ON a.tail = t.tail\nGROUP BY Model HAVING Aircraft >= 10 AND Flights >= 5000\nORDER BY `Cxl/1k` DESC"
+          "rawSql": "SELECT if(a.make_model = '', '(not in registry)', a.make_model) AS Model,\n       count() AS Aircraft,\n       sum(t.flights) AS Flights,\n       round(avg(a.year_mfr), 0) AS `Avg built`,\n       round(1000 * sum(t.cxl) / Flights, 2) AS `Cxl/1k`,\n       round(sum(t.delay) / sum(t.done), 1) AS `Delay min/flt`\nFROM (\n    SELECT tail, sum(flights) AS flights, sum(cxl_carrier) AS cxl,\n           sum(carrier_delay) AS delay, sum(completed) AS done\n    FROM faa.tail_day WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''\n    GROUP BY tail\n) AS t\nLEFT JOIN faa.aircraft_info AS a ON a.tail = t.tail\nGROUP BY Model HAVING Aircraft >= 10 AND Flights >= 5000\nORDER BY `Cxl/1k` DESC"
         }
       ],
       "fieldConfig": {
@@ -777,7 +777,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT multiIf(t.year - a.year_mfr < 5, '0-4', t.year - a.year_mfr < 10, '5-9',\n               t.year - a.year_mfr < 15, '10-14', t.year - a.year_mfr < 20, '15-19',\n               t.year - a.year_mfr < 25, '20-24', '25+') AS bucket,\n       round(1000 * sum(t.cxl) / sum(t.flights), 2) AS `Carrier cxl / 1k flights`,\n       round(sum(t.delay) / sum(t.done), 1) AS `Carrier delay min / flight`,\n       uniqExact(t.tail) AS aircraft\nFROM (\n    SELECT tail, toYear(FlightDate) AS year, countIf(Cancelled = 1 AND CancellationCode = 'A') AS cxl, count() AS flights,\n           sum(CarrierDelay) AS delay, countIf(Cancelled = 0) AS done\n    FROM faa.ontime WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''\n    GROUP BY tail, year\n) AS t\nINNER JOIN faa.aircraft_info AS a ON a.tail = t.tail\nWHERE a.year_mfr IS NOT NULL\nGROUP BY bucket ORDER BY min(t.year - a.year_mfr)"
+          "rawSql": "SELECT multiIf(t.year - a.year_mfr < 5, '0-4', t.year - a.year_mfr < 10, '5-9',\n               t.year - a.year_mfr < 15, '10-14', t.year - a.year_mfr < 20, '15-19',\n               t.year - a.year_mfr < 25, '20-24', '25+') AS bucket,\n       round(1000 * sum(t.cxl) / sum(t.flights), 2) AS `Carrier cxl / 1k flights`,\n       round(sum(t.delay) / sum(t.done), 1) AS `Carrier delay min / flight`,\n       uniqExact(t.tail) AS aircraft\nFROM (\n    SELECT tail, toYear(FlightDate) AS year, sum(cxl_carrier) AS cxl, sum(flights) AS flights,\n           sum(carrier_delay) AS delay, sum(completed) AS done\n    FROM faa.tail_day WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''\n    GROUP BY tail, year\n) AS t\nINNER JOIN faa.aircraft_info AS a ON a.tail = t.tail\nWHERE a.year_mfr IS NOT NULL\nGROUP BY bucket ORDER BY min(t.year - a.year_mfr)"
         }
       ],
       "fieldConfig": {
@@ -859,7 +859,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT time, cxl AS `Carrier cancellations`,\n       avg(cxl) OVER (ORDER BY time ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) AS `7-day average`\nFROM (\n    SELECT toDateTime(FlightDate) AS time, countIf(Cancelled = 1 AND CancellationCode = 'A') AS cxl\n    FROM faa.ontime WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote})\n    GROUP BY time\n)\nORDER BY time"
+          "rawSql": "SELECT time, cxl AS `Carrier cancellations`,\n       avg(cxl) OVER (ORDER BY time ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) AS `7-day average`\nFROM (\n    SELECT toDateTime(FlightDate) AS time, sum(cxl_carrier) AS cxl\n    FROM faa.tail_day WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote})\n    GROUP BY time\n)\nORDER BY time"
         }
       ],
       "fieldConfig": {
@@ -950,7 +950,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT t.Tail, t.Airline, a.make_model AS Model, a.year_mfr AS Built, t.* EXCEPT (Tail, Airline)\nFROM (\n    SELECT tail AS Tail, any(Reporting_Airline) AS Airline,\n           count() AS Flights,\n           countIf(Cancelled = 1 AND CancellationCode = 'A') AS `Cxl`,\n           round(1000 * Cxl / Flights, 1) AS `Cxl/1k`,\n           round(sum(CarrierDelay) / countIf(Cancelled = 0), 1) AS `Delay min/flt`,\n           countIf(Diverted = 1) AS Diverted,\n           uniqExact(FlightDate) AS `Days flown`,\n           arrayMax(arrayDifference(arraySort(groupUniqArray(toRelativeDayNum(FlightDate))))) - 1\n               AS `Longest gap`,\n           toString(max(FlightDate)) AS `Last flown`\n    FROM faa.ontime WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''\n    GROUP BY tail HAVING Flights >= ${min_flights}\n    ORDER BY `Cxl/1k` DESC, `Delay min/flt` DESC\n    LIMIT 100\n) AS t\nLEFT JOIN faa.aircraft_info AS a ON a.tail = t.Tail\nORDER BY `Cxl/1k` DESC, `Delay min/flt` DESC"
+          "rawSql": "SELECT t.Tail, t.Airline, a.make_model AS Model, a.year_mfr AS Built, t.* EXCEPT (Tail, Airline)\nFROM (\n    SELECT tail AS Tail, any(Reporting_Airline) AS Airline,\n           sum(flights) AS Flights,\n           sum(cxl_carrier) AS `Cxl`,\n           round(1000 * Cxl / Flights, 1) AS `Cxl/1k`,\n           round(sum(carrier_delay) / sum(completed), 1) AS `Delay min/flt`,\n           sum(diverted) AS Diverted,\n           uniqExact(FlightDate) AS `Days flown`,\n           arrayMax(arrayDifference(arraySort(groupUniqArray(toRelativeDayNum(FlightDate))))) - 1\n               AS `Longest gap`,\n           toString(max(FlightDate)) AS `Last flown`\n    FROM faa.tail_day WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''\n    GROUP BY tail HAVING Flights >= ${min_flights}\n    ORDER BY `Cxl/1k` DESC, `Delay min/flt` DESC\n    LIMIT 100\n) AS t\nLEFT JOIN faa.aircraft_info AS a ON a.tail = t.Tail\nORDER BY `Cxl/1k` DESC, `Delay min/flt` DESC"
         }
       ],
       "fieldConfig": {
@@ -1186,7 +1186,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT count() FROM faa.ontime WHERE $__dateFilter(FlightDate) AND tail = '${tail}'"
+          "rawSql": "SELECT sum(flights) FROM faa.tail_day WHERE $__dateFilter(FlightDate) AND tail = '${tail}'"
         }
       ],
       "fieldConfig": {
@@ -1247,7 +1247,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT countIf(Cancelled = 1 AND CancellationCode = 'A') FROM faa.ontime WHERE $__dateFilter(FlightDate) AND tail = '${tail}'"
+          "rawSql": "SELECT sum(cxl_carrier) FROM faa.tail_day WHERE $__dateFilter(FlightDate) AND tail = '${tail}'"
         }
       ],
       "fieldConfig": {
@@ -1316,7 +1316,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT 1000 * countIf(Cancelled = 1 AND CancellationCode = 'A') / count() FROM faa.ontime WHERE $__dateFilter(FlightDate) AND tail = '${tail}'"
+          "rawSql": "SELECT 1000 * sum(cxl_carrier) / sum(flights) FROM faa.tail_day WHERE $__dateFilter(FlightDate) AND tail = '${tail}'"
         }
       ],
       "fieldConfig": {
@@ -1377,7 +1377,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT sum(CarrierDelay) / countIf(Cancelled = 0) FROM faa.ontime WHERE $__dateFilter(FlightDate) AND tail = '${tail}'"
+          "rawSql": "SELECT sum(carrier_delay) / sum(completed) FROM faa.tail_day WHERE $__dateFilter(FlightDate) AND tail = '${tail}'"
         }
       ],
       "fieldConfig": {
@@ -1438,7 +1438,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT uniqExact(FlightDate) FROM faa.ontime WHERE $__dateFilter(FlightDate) AND tail = '${tail}'"
+          "rawSql": "SELECT uniqExact(FlightDate) FROM faa.tail_day WHERE $__dateFilter(FlightDate) AND tail = '${tail}'"
         }
       ],
       "fieldConfig": {
@@ -1499,7 +1499,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT arrayMax(arrayDifference(arraySort(groupUniqArray(toRelativeDayNum(FlightDate))))) - 1\nFROM faa.ontime WHERE $__dateFilter(FlightDate) AND tail = '${tail}'"
+          "rawSql": "SELECT arrayMax(arrayDifference(arraySort(groupUniqArray(toRelativeDayNum(FlightDate))))) - 1\nFROM faa.tail_day WHERE $__dateFilter(FlightDate) AND tail = '${tail}'"
         }
       ],
       "fieldConfig": {
@@ -1560,7 +1560,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT toDateTime(FlightDate) AS time,\n       countIf(Cancelled = 0) AS Flown,\n       countIf(Cancelled = 1 AND CancellationCode = 'A') AS `Carrier cancellations`,\n       countIf(Cancelled = 1 AND CancellationCode != 'A') AS `Other cancellations`\nFROM faa.ontime WHERE $__dateFilter(FlightDate) AND tail = '${tail}'\nGROUP BY time ORDER BY time"
+          "rawSql": "SELECT toDateTime(FlightDate) AS time,\n       sum(completed) AS Flown,\n       sum(cxl_carrier) AS `Carrier cancellations`,\n       sum(cxl_other) AS `Other cancellations`\nFROM faa.tail_day WHERE $__dateFilter(FlightDate) AND tail = '${tail}'\nGROUP BY time ORDER BY time"
         }
       ],
       "fieldConfig": {

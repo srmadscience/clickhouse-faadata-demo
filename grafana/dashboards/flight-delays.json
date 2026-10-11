@@ -567,7 +567,7 @@
       "id": 8
     },
     {
-      "type": "barchart",
+      "type": "timeseries",
       "title": "Delay minutes by cause, per month",
       "description": "Total delay minutes attributed to each cause (reported for flights arriving 15+ min late). Note most weather delay is booked under NAS, not 'Extreme weather'.",
       "datasource": {
@@ -590,31 +590,35 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT formatDateTime(toStartOfMonth(FlightDate), '%Y-%m') AS month,\n       sum(CarrierDelay) AS Carrier,\n       sum(LateAircraftDelay) AS `Late aircraft`,\n       sum(NASDelay) AS `Air traffic system (NAS)`,\n       sum(WeatherDelay) AS `Extreme weather`,\n       sum(SecurityDelay) AS Security\nFROM faa.ontime WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND Origin IN (${origin:singlequote})\nGROUP BY month ORDER BY month"
+          "rawSql": "SELECT toDateTime(toStartOfMonth(FlightDate)) AS time,\n       sum(CarrierDelay) AS Carrier,\n       sum(LateAircraftDelay) AS `Late aircraft`,\n       sum(NASDelay) AS `Air traffic system (NAS)`,\n       sum(WeatherDelay) AS `Extreme weather`,\n       sum(SecurityDelay) AS Security\nFROM faa.ontime WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND Origin IN (${origin:singlequote})\nGROUP BY time ORDER BY time"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "short",
           "custom": {
+            "drawStyle": "bars",
             "fillOpacity": 85,
-            "lineWidth": 0
+            "lineWidth": 0,
+            "barAlignment": 1,
+            "barWidthFactor": 0.9,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
           }
         },
         "overrides": []
       },
       "options": {
-        "stacking": "normal",
-        "xField": "month",
-        "showValue": "never",
         "legend": {
           "displayMode": "list",
           "placement": "bottom"
         },
         "tooltip": {
           "mode": "multi"
-        },
-        "xTickLabelRotation": -45
+        }
       },
       "id": 9
     },
