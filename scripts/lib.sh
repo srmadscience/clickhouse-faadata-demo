@@ -60,8 +60,8 @@ ch_check_connection() {
 }
 
 # Builds the Java loader if it isn't there yet.
-ensure_loader() {
-  if [[ ! -f "$LOADER_JAR" ]]; then
+ensure_loader() {  # builds the loader if it is missing or older than its source
+  if [[ ! -f "$LOADER_JAR" || -n "$(find "$PROJECT_DIR/src" "$PROJECT_DIR/pom.xml" -newer "$LOADER_JAR" | head -1)" ]]; then
     echo "Building loader..."
     (cd "$PROJECT_DIR" && mvn -q -B package -DskipTests)
   fi

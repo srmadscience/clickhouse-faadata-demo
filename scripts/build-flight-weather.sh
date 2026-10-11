@@ -42,8 +42,16 @@ LOCAL_DEP="concat(toString(o.FlightDate + (o.CRSDepTime >= 2400)), ' ',
                   leftPad(toString(o.CRSDepTime % 100), 2, '0'), ':00')"
 DEP_UTC=$(utc_of "$LOCAL_DEP" "ao.tzname")
 
-# Weather with derived ceiling, flight category and present-weather class.
-WX="
+# Weather with derived ceiling, flight category and present-weather class, for
+# the observations a month's flights can match. Each end takes the latest report
+# at or before its scheduled UTC time, and reports over 2 hours old are not used,
+# so the month from a day before to two days after is enough: departures start
+# at most 11 hours before the month in UTC, and the last arrivals (checked over
+# 2016-2026) end within a day of it. Without this window, every month's build
+# would read all the weather, twice.
+wx() {  # wx YYYYMM
+  local start="toDateTime(toDate('${1:0:4}-${1:4:2}-01'), 'UTC')"
+  echo "
   SELECT station, valid, tmpf, sknt, gust, vsby, p01i, wxcodes,
          arrayFilter((l, c) -> c IN ('BKN', 'OVC', 'VV') AND l IS NOT NULL,
                      [skyl1, skyl2, skyl3, skyl4], [skyc1, skyc2, skyc3, skyc4]) AS layers,
@@ -55,7 +63,9 @@ WX="
          multiIf(match(wxcodes, 'TS'), 'Thunderstorm', match(wxcodes, 'FZ'), 'Freezing',
                  match(wxcodes, 'SN|SG|PL|GS|GR'), 'Snow/ice', match(wxcodes, 'FG'), 'Fog',
                  match(wxcodes, 'RA|DZ|SH'), 'Rain', 'None') AS wx
-  FROM faa.weather"
+  FROM faa.weather
+  WHERE valid >= $start - INTERVAL 1 DAY AND valid < $start + INTERVAL 1 MONTH + INTERVAL 2 DAY"
+}
 
 # Fields copied from the matched observation, NULLed if it is over 2 hours old.
 obs() {  # obs ALIAS PREFIX SCHED_COL
@@ -89,8 +99,8 @@ for m in "${months[@]}"; do
         LEFT JOIN faa.airport_station AS ad ON ad.airport = o.Dest
         WHERE toYYYYMM(o.FlightDate) = $m AND ao.tzname != ''
     ) AS f
-    ASOF LEFT JOIN ($WX) AS ow ON ow.station = f.o_station AND ow.valid <= f.sched_dep_utc
-    ASOF LEFT JOIN ($WX) AS dw ON dw.station = f.d_station AND dw.valid <= f.sched_arr_utc
+    ASOF LEFT JOIN ($(wx "$m")) AS ow ON ow.station = f.o_station AND ow.valid <= f.sched_dep_utc
+    ASOF LEFT JOIN ($(wx "$m")) AS dw ON dw.station = f.d_station AND dw.valid <= f.sched_arr_utc
     SETTINGS join_use_nulls = 0"
   echo "$m: $(ch_query "SELECT count() FROM faa.flight_weather WHERE toYYYYMM(FlightDate) = $m") flights"
 done

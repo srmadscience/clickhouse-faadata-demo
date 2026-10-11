@@ -16,12 +16,17 @@
 
 package ie.rolfe.faadata;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.SequenceInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
@@ -40,13 +45,15 @@ import com.clickhouse.data.ClickHouseFormat;
  * <pre>
  *   ping                          check connectivity and print the server version
  *   schema &lt;file.sql&gt;...          run ';'-separated DDL statements
- *   load &lt;table&gt; [--set k=v]... &lt;path&gt;...
+ *   load &lt;table&gt; [--set k=v]... [--combine] &lt;path&gt;...
  *                                 stream CSV files (plain, .gz or .zip) into a table,
  *                                 applying ClickHouse settings to each insert
  * </pre>
  *
  * Files are streamed straight from disk to ClickHouse, so memory use is
- * independent of file size.
+ * independent of file size. Each file is one insert, unless --combine is given:
+ * then all the plain or .gz files under each path go in one insert, which is much
+ * faster for many small files. Their header lines must be identical.
  */
 public class Loader {
 
@@ -78,7 +85,7 @@ public class Loader {
     }
 
     private static void usage() {
-        System.err.println("usage: Loader ping | schema <file.sql>... | load <table> [--set k=v]... <file-or-dir>...");
+        System.err.println("usage: Loader ping | schema <file.sql>... | load <table> [--set k=v]... [--combine] <file-or-dir>...");
     }
 
     private static void ping(Client client, ClickHouseConfig config) throws Exception {
@@ -106,8 +113,11 @@ public class Loader {
     private static void load(Client client, String table, List<String> args) throws Exception {
         InsertSettings settings = new InsertSettings();
         List<String> paths = new ArrayList<>();
+        boolean combine = false;
         for (int i = 0; i < args.size(); i++) {
-            if (args.get(i).equals("--set") && i + 1 < args.size()) {
+            if (args.get(i).equals("--combine")) {
+                combine = true;
+            } else if (args.get(i).equals("--set") && i + 1 < args.size()) {
                 String[] kv = args.get(++i).split("=", 2);
                 if (kv.length != 2) {
                     throw new IllegalArgumentException("--set expects key=value, got " + args.get(i));
@@ -118,6 +128,18 @@ public class Loader {
             }
         }
         long totalRows = 0;
+        if (combine) {
+            for (String path : paths) {
+                List<Path> files = expand(List.of(path));
+                long start = System.nanoTime();
+                long rows = insert(client, table, new ConcatenatedCsv(files), settings);
+                totalRows += rows;
+                System.out.printf("%s (%,d files) -> %s: %,d rows in %.1fs%n",
+                        path, files.size(), table, rows, (System.nanoTime() - start) / 1e9);
+            }
+            System.out.printf("Total: %,d rows%n", totalRows);
+            return;
+        }
         for (Path file : expand(paths)) {
             long start = System.nanoTime();
             long rows = loadFile(client, table, file, settings);
@@ -172,6 +194,83 @@ public class Loader {
             }
         }
         return files;
+    }
+
+    private static InputStream open(Path file) throws IOException {
+        InputStream raw = Files.newInputStream(file);
+        return file.getFileName().toString().toLowerCase().endsWith(".gz") ? new GZIPInputStream(raw, 1 << 16) : raw;
+    }
+
+    /**
+     * Several CSV files read as one: the first file's header line, then every
+     * file's data lines. Files are opened one at a time, as they are reached.
+     */
+    private static final class ConcatenatedCsv extends InputStream {
+        private final Iterator<Path> files;
+        private byte[] header;
+        private Path current;
+        private InputStream in = InputStream.nullInputStream();
+        private int last = '\n';
+
+        ConcatenatedCsv(List<Path> files) {
+            this.files = files.iterator();
+        }
+
+        @Override
+        public int read() throws IOException {
+            byte[] b = new byte[1];
+            return read(b, 0, 1) < 0 ? -1 : b[0] & 0xff;
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            if (len == 0) {
+                return 0;
+            }
+            while (true) {
+                int n = in.read(b, off, len);
+                if (n > 0) {
+                    last = b[off + n - 1];
+                    return n;
+                }
+                if (last != '\n') {
+                    // the file just finished had no final newline
+                    last = '\n';
+                    b[off] = '\n';
+                    return 1;
+                }
+                in.close();
+                if (!files.hasNext()) {
+                    return -1;
+                }
+                current = files.next();
+                in = open(current);
+                byte[] line = readLine(in);
+                if (header == null) {
+                    header = line;
+                    in = new SequenceInputStream(new ByteArrayInputStream(line), in);
+                } else if (!Arrays.equals(line, header)) {
+                    throw new IOException(current + ": header differs from the first file's");
+                }
+            }
+        }
+
+        private static byte[] readLine(InputStream in) throws IOException {
+            ByteArrayOutputStream line = new ByteArrayOutputStream();
+            int c;
+            while ((c = in.read()) >= 0) {
+                line.write(c);
+                if (c == '\n') {
+                    break;
+                }
+            }
+            return line.toByteArray();
+        }
+
+        @Override
+        public void close() throws IOException {
+            in.close();
+        }
     }
 
     /** Stops the client from closing a ZipInputStream between entries. */
