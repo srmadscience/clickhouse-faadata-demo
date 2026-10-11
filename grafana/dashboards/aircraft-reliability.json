@@ -43,7 +43,7 @@
       },
       {
         "name": "min_flights",
-        "label": "Min flights per aircraft",
+        "label": "Min flights flown",
         "type": "custom",
         "query": "50,100,250,500,1000",
         "multi": false,
@@ -79,7 +79,8 @@
             "value": "1000",
             "selected": false
           }
-        ]
+        ],
+        "description": "Only aircraft that completed at least this many flights in the time range are ranked. Counting completed rather than scheduled flights keeps out placeholder tails, such as Frontier's N399FR, that airlines put on flights they cancel."
       },
       {
         "name": "tail",
@@ -587,7 +588,7 @@
     {
       "type": "barchart",
       "title": "Aircraft by carrier-cancellation rate",
-      "description": "How many aircraft fall into each band of carrier cancellations per 1,000 flights (aircraft with at least the minimum number of flights).",
+      "description": "How many aircraft fall into each band of carrier cancellations per 1,000 flights (aircraft that flew at least the minimum number of flights).",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse-faa"
@@ -608,7 +609,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT bucket, count() AS Aircraft FROM (\n    SELECT tail,\n           1000 * sum(cxl_carrier) / sum(flights) AS rate,\n           multiIf(rate = 0, '0', rate < 1, '<1', rate < 2, '1-2', rate < 3, '2-3', rate < 5, '3-5',\n                   rate < 10, '5-10', '10+') AS bucket,\n           indexOf(['0','<1','1-2','2-3','3-5','5-10','10+'], bucket) AS ord\n    FROM faa.tail_day WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''\n    GROUP BY tail HAVING sum(flights) >= ${min_flights}\n)\nGROUP BY bucket, ord ORDER BY ord"
+          "rawSql": "SELECT bucket, count() AS Aircraft FROM (\n    SELECT tail,\n           1000 * sum(cxl_carrier) / sum(flights) AS rate,\n           multiIf(rate = 0, '0', rate < 1, '<1', rate < 2, '1-2', rate < 3, '2-3', rate < 5, '3-5',\n                   rate < 10, '5-10', '10+') AS bucket,\n           indexOf(['0','<1','1-2','2-3','3-5','5-10','10+'], bucket) AS ord\n    FROM faa.tail_day WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''\n    GROUP BY tail HAVING sum(completed) >= ${min_flights}\n)\nGROUP BY bucket, ord ORDER BY ord"
         }
       ],
       "fieldConfig": {
@@ -929,7 +930,7 @@
     {
       "type": "table",
       "title": "Least reliable aircraft",
-      "description": "Aircraft with at least the minimum flights, worst carrier-cancellation rate first. Cxl = carrier cancellations; Cxl/1k = per 1,000 flights; Delay min/flt = carrier delay minutes per completed flight; Longest gap = longest run of days without a flight (often heavy maintenance or storage). Click a tail to inspect it below.",
+      "description": "Aircraft that flew at least the minimum number of flights, worst carrier-cancellation rate first. Cxl = carrier cancellations; Cxl/1k = per 1,000 flights; Delay min/flt = carrier delay minutes per completed flight; Longest gap = longest run of days without a flight (often heavy maintenance or storage). Click a tail to inspect it below.",
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse-faa"
@@ -950,7 +951,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT t.Tail, t.Airline, a.make_model AS Model, a.year_mfr AS Built, t.* EXCEPT (Tail, Airline)\nFROM (\n    SELECT tail AS Tail, any(Reporting_Airline) AS Airline,\n           sum(flights) AS Flights,\n           sum(cxl_carrier) AS `Cxl`,\n           round(1000 * Cxl / Flights, 1) AS `Cxl/1k`,\n           round(sum(carrier_delay) / sum(completed), 1) AS `Delay min/flt`,\n           sum(diverted) AS Diverted,\n           uniqExact(FlightDate) AS `Days flown`,\n           arrayMax(arrayDifference(arraySort(groupUniqArray(toRelativeDayNum(FlightDate))))) - 1\n               AS `Longest gap`,\n           toString(max(FlightDate)) AS `Last flown`\n    FROM faa.tail_day WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''\n    GROUP BY tail HAVING Flights >= ${min_flights}\n    ORDER BY `Cxl/1k` DESC, `Delay min/flt` DESC\n    LIMIT 100\n) AS t\nLEFT JOIN faa.aircraft_info AS a ON a.tail = t.Tail\nORDER BY `Cxl/1k` DESC, `Delay min/flt` DESC"
+          "rawSql": "SELECT t.Tail, t.Airline, a.make_model AS Model, a.year_mfr AS Built, t.* EXCEPT (Tail, Airline)\nFROM (\n    SELECT tail AS Tail, any(Reporting_Airline) AS Airline,\n           sum(flights) AS Flights,\n           sum(cxl_carrier) AS `Cxl`,\n           round(1000 * Cxl / Flights, 1) AS `Cxl/1k`,\n           round(sum(carrier_delay) / sum(completed), 1) AS `Delay min/flt`,\n           sum(diverted) AS Diverted,\n           uniqExact(FlightDate) AS `Days flown`,\n           arrayMax(arrayDifference(arraySort(groupUniqArray(toRelativeDayNum(FlightDate))))) - 1\n               AS `Longest gap`,\n           toString(max(FlightDate)) AS `Last flown`\n    FROM faa.tail_day WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''\n    GROUP BY tail HAVING sum(completed) >= ${min_flights}\n    ORDER BY `Cxl/1k` DESC, `Delay min/flt` DESC\n    LIMIT 100\n) AS t\nLEFT JOIN faa.aircraft_info AS a ON a.tail = t.Tail\nORDER BY `Cxl/1k` DESC, `Delay min/flt` DESC"
         }
       ],
       "fieldConfig": {
