@@ -64,6 +64,47 @@
         },
         "sort": 1,
         "options": []
+      },
+      {
+        "name": "min_flights",
+        "label": "Min flights flown",
+        "type": "custom",
+        "query": "50,100,250,500,1000",
+        "multi": false,
+        "includeAll": false,
+        "current": {
+          "selected": true,
+          "text": "250",
+          "value": "250"
+        },
+        "options": [
+          {
+            "text": "50",
+            "value": "50",
+            "selected": false
+          },
+          {
+            "text": "100",
+            "value": "100",
+            "selected": false
+          },
+          {
+            "text": "250",
+            "value": "250",
+            "selected": true
+          },
+          {
+            "text": "500",
+            "value": "500",
+            "selected": false
+          },
+          {
+            "text": "1000",
+            "value": "1000",
+            "selected": false
+          }
+        ],
+        "description": "Only city pairs and flight numbers with at least this many completed flights in the time range are ranked in the top-10 charts, so that a few cancellations on a rarely flown route don't top the list."
       }
     ]
   },
@@ -1014,6 +1055,152 @@
         "cellHeight": "sm"
       },
       "id": 14
+    },
+    {
+      "type": "barchart",
+      "title": "Top 10 least reliable city pairs",
+      "description": "Airport pairs, both directions together, with the most carrier cancellations (code A) per 1,000 flights, among pairs with at least the minimum number of completed flights; ties go to the pair with more carrier delay per flight. The Origin airport filter applies to where each flight left from.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-faa"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 41,
+        "w": 12,
+        "h": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 0,
+            "axisLabel": "Carrier cancellations per 1,000 flights"
+          },
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "red"
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^(delay|one_flight)$"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "viz": true,
+                  "legend": true,
+                  "tooltip": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "xField": "City pair",
+        "orientation": "horizontal",
+        "showValue": "always",
+        "barWidth": 0.8,
+        "legend": {
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-faa"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT concat(least(Origin, Dest), '–', greatest(Origin, Dest)) AS `City pair`,\n       round(1000 * countIf(Cancelled = 1 AND CancellationCode = 'A') / count(), 1) AS `Carrier cxl / 1k flights`,\n       round(sum(CarrierDelay) / countIf(Cancelled = 0), 1) AS delay,\n       -- as text, so they appear in the tooltip without being drawn as bars\n       -- city names from one flight of the pair, ordered like the airport codes\n       any((Origin, OriginCityName, DestCityName)) AS one_flight,\n       if(startsWith(`City pair`, one_flight.1), concat(one_flight.2, ' – ', one_flight.3), concat(one_flight.3, ' – ', one_flight.2)) AS Cities,\n       toString(count()) AS Flights, toString(delay) AS `Carrier delay min/flt`\nFROM faa.ontime WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND Origin IN (${origin:singlequote})\nGROUP BY `City pair` HAVING countIf(Cancelled = 0) >= ${min_flights}\nORDER BY `Carrier cxl / 1k flights` DESC, delay DESC\nLIMIT 10"
+        }
+      ],
+      "id": 15
+    },
+    {
+      "type": "barchart",
+      "title": "Top 10 least reliable flight numbers",
+      "description": "Flight numbers with the most carrier cancellations (code A) per 1,000 flights, among those with at least the minimum number of completed flights; ties go to the one with more carrier delay per flight. Airlines reuse a number on several routes over time: the label shows the route it flew most, and the tooltip how many it flew.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-faa"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 41,
+        "w": 12,
+        "h": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 0,
+            "axisLabel": "Carrier cancellations per 1,000 flights"
+          },
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "red"
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "delay"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "viz": true,
+                  "legend": true,
+                  "tooltip": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "xField": "Flight",
+        "orientation": "horizontal",
+        "showValue": "always",
+        "barWidth": 0.8,
+        "legend": {
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-faa"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "-- Rank first, then find the main route of just the ten flights ranked.\nWITH top AS (\n    SELECT Reporting_Airline AS airline, Flight_Number_Reporting_Airline AS number, count() AS flights,\n           round(1000 * countIf(Cancelled = 1 AND CancellationCode = 'A') / flights, 1) AS cxl,\n           round(sum(CarrierDelay) / countIf(Cancelled = 0), 1) AS carrier_delay\n    FROM faa.ontime WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND Origin IN (${origin:singlequote})\n    GROUP BY airline, number HAVING countIf(Cancelled = 0) >= ${min_flights}\n    ORDER BY cxl DESC, carrier_delay DESC\n    LIMIT 10\n)\nSELECT concat(airline, ' ', toString(number), ' (', topK(1)(concat(Origin, '–', Dest))[1], ')') AS Flight,\n       any(cxl) AS `Carrier cxl / 1k flights`, any(carrier_delay) AS delay,\n       -- as text, so they appear in the tooltip without being drawn as bars\n       toString(uniqExact(Origin, Dest)) AS Routes,\n       toString(any(flights)) AS Flights, toString(delay) AS `Carrier delay min/flt`\nFROM faa.ontime INNER JOIN top ON Reporting_Airline = airline AND Flight_Number_Reporting_Airline = number\nWHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND Origin IN (${origin:singlequote})\nGROUP BY airline, number\nORDER BY `Carrier cxl / 1k flights` DESC, delay DESC"
+        }
+      ],
+      "id": 16
     }
   ],
   "schemaVersion": 41,
