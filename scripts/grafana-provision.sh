@@ -1,25 +1,42 @@
 #!/usr/bin/env bash
-# Configures Grafana on kolcheck over SSH (needs key login and passwordless sudo):
+# Configures a Grafana server over SSH: a Linux package install (/etc/grafana,
+# /var/lib/grafana, systemd service grafana-server) with the
+# grafana-clickhouse-datasource plugin, reached with key login and passwordless sudo.
 #   - installs the ClickHouse datasource and dashboard provider from grafana/provisioning/
 #   - copies grafana/dashboards/*.json to the dashboard folder Grafana watches
 #   - gives grafana-server the ClickHouse credentials via a root-only env file
 #   - restarts Grafana and reports provisioning errors from its log
 # Safe to re-run; re-run after adding or changing dashboards.
 #
+# Settings: grafana.* in clickhouse.properties (see clickhouse.properties.example),
+# or the environment variables below.
+#
 #   scripts/grafana-provision.sh
-#   GRAFANA_SSH=pi@otherhost scripts/grafana-provision.sh
+#   GRAFANA_SSH=me@grafana-host scripts/grafana-provision.sh
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 
-GRAFANA_SSH="${GRAFANA_SSH:-pi@kolcheck}"
+GRAFANA_SSH="${GRAFANA_SSH:-$(prop grafana.ssh)}"
+[[ -n "$GRAFANA_SSH" ]] || { echo "error: set grafana.ssh=user@host in clickhouse.properties, or GRAFANA_SSH" >&2; exit 1; }
+GRAFANA_URL="${GRAFANA_URL:-$(prop grafana.url)}"
+GRAFANA_URL="${GRAFANA_URL:-http://${GRAFANA_SSH#*@}:3000}"
+GRAFANA_PORT=$(sed -E 's#^[a-z]+://[^/:]+:?([0-9]*).*#\1#' <<< "$GRAFANA_URL"); GRAFANA_PORT="${GRAFANA_PORT:-3000}"
+# ClickHouse as Grafana reaches it (native protocol), by default the host in clickhouse.url.
+GF_CH_HOST="${GRAFANA_CLICKHOUSE_HOST:-$(prop grafana.clickhouse.host)}"
+GF_CH_HOST="${GF_CH_HOST:-$(sed -E 's#^[a-z]+://([^/:]+).*#\1#' <<< "$CH_URL")}"
+GF_CH_PORT="${GRAFANA_CLICKHOUSE_PORT:-$(prop grafana.clickhouse.port)}"; GF_CH_PORT="${GF_CH_PORT:-9000}"
+if [[ "$GF_CH_HOST" =~ ^(localhost|127\.0\.0\.1|::1)$ && ! "${GRAFANA_SSH#*@}" =~ ^(localhost|127\.0\.0\.1|::1)$ ]]; then
+  echo "warn: Grafana will look for ClickHouse at $GF_CH_HOST, i.e. on the Grafana server itself;" >&2
+  echo "      set grafana.clickhouse.host if ClickHouse runs elsewhere" >&2
+fi
+
 PROV="$PROJECT_DIR/grafana/provisioning"
-[[ -n "$CH_PASSWORD" ]] || { echo "error: no ClickHouse password (clickhouse.properties)" >&2; exit 1; }
 
 remote() { ssh -o BatchMode=yes "$GRAFANA_SSH" "$@"; }
 
-echo "Installing provisioning files on $GRAFANA_SSH"
-remote "sudo install -o root -g grafana -m 640 /dev/stdin /etc/grafana/provisioning/datasources/faa-clickhouse.yaml" \
-  < "$PROV/datasources/clickhouse.yaml"
+echo "Installing provisioning files on $GRAFANA_SSH (ClickHouse at $GF_CH_HOST:$GF_CH_PORT)"
+sed -e "s/__CLICKHOUSE_HOST__/$GF_CH_HOST/" -e "s/__CLICKHOUSE_PORT__/$GF_CH_PORT/" "$PROV/datasources/clickhouse.yaml" \
+  | remote "sudo install -o root -g grafana -m 640 /dev/stdin /etc/grafana/provisioning/datasources/faa-clickhouse.yaml"
 remote "sudo install -o root -g grafana -m 640 /dev/stdin /etc/grafana/provisioning/dashboards/faa.yaml" \
   < "$PROV/dashboards/faa.yaml"
 
@@ -43,7 +60,7 @@ echo "Restarting Grafana"
 since=$(remote "date '+%Y-%m-%d %H:%M:%S'")
 remote "sudo systemctl daemon-reload && sudo systemctl restart grafana-server"
 for _ in $(seq 30); do
-  remote "curl -fs http://localhost:3000/api/health > /dev/null" && break
+  remote "curl -fs http://localhost:$GRAFANA_PORT/api/health > /dev/null" && break
   sleep 2
 done
 remote "systemctl is-active grafana-server"
@@ -55,4 +72,7 @@ if [[ -n "$errors" ]]; then
   echo "$errors" >&2
   exit 1
 fi
-echo "Grafana provisioned: datasource 'ClickHouse FAA' (uid clickhouse-faa)"
+echo "Grafana provisioned: datasource 'ClickHouse FAA' (uid clickhouse-faa). Dashboards:"
+for f in "$PROJECT_DIR"/grafana/dashboards/*.json; do
+  python3 -I -c 'import json, sys; d = json.load(open(sys.argv[1])); print("  %s: %s/d/%s" % (d["title"], sys.argv[2], d["uid"]))' "$f" "$GRAFANA_URL"
+done

@@ -30,7 +30,7 @@ public record ClickHouseConfig(String endpoint, String user, String password, St
             }
         }
         return new ClickHouseConfig(
-                resolve(props, "CLICKHOUSE_URL", "clickhouse.url", "http://xraytunnel:8123"),
+                resolve(props, "CLICKHOUSE_URL", "clickhouse.url", "http://localhost:8123"),
                 resolve(props, "CLICKHOUSE_USER", "clickhouse.user", "default"),
                 resolve(props, "CLICKHOUSE_PASSWORD", "clickhouse.password", ""),
                 resolve(props, "CLICKHOUSE_DATABASE", "clickhouse.database", "faa"));
@@ -51,11 +51,11 @@ public record ClickHouseConfig(String endpoint, String user, String password, St
                 .setPassword(password)
                 .setDefaultDatabase(database)
                 // Standard HTTP Content-Encoding rather than ClickHouse's native
-                // framing: xraytunnel uses ZSTD network compression, which the
-                // client's native decoder (LZ4 only) can't read.
+                // framing: a server set to ZSTD network compression would
+                // otherwise send frames the client's LZ4-only decoder can't read.
                 .useHttpCompression(true)
                 // Uploads go uncompressed: the client's pure-Java LZ4 encoder
-                // manages ~0.3 MB/s, far slower than the LAN to xraytunnel.
+                // manages ~0.3 MB/s, far slower than a LAN to the server.
                 .compressClientRequest(false)
                 .build();
     }

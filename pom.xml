@@ -48,7 +48,7 @@
                 <version>3.5.2</version>
             </plugin>
             <!-- Builds target/clickhouse-faadata-demo-<ver>-all.jar so the loader can be
-                 copied to xraytunnel and run next to the data. -->
+                 copied to another machine (e.g. the ClickHouse server) and run next to the data. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>

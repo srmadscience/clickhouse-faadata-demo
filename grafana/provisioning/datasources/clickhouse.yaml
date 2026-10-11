@@ -1,6 +1,8 @@
-# Installed on kolcheck by scripts/grafana-provision.sh, which also supplies
-# CLICKHOUSE_USER / CLICKHOUSE_PASSWORD to grafana-server's environment.
-# Requires the grafana-clickhouse-datasource plugin (4.x).
+# Installed by scripts/grafana-provision.sh, which fills in __CLICKHOUSE_HOST__
+# and __CLICKHOUSE_PORT__ (ClickHouse's native protocol, as Grafana reaches it)
+# and supplies CLICKHOUSE_USER / CLICKHOUSE_PASSWORD to grafana-server's
+# environment. Requires the grafana-clickhouse-datasource plugin (4.x).
+# The dashboards refer to this datasource by its uid, clickhouse-faa.
 apiVersion: 1
 datasources:
   - name: ClickHouse FAA
@@ -8,8 +10,8 @@ datasources:
     uid: clickhouse-faa
     isDefault: true
     jsonData:
-      host: xraytunnel
-      port: 9000
+      host: __CLICKHOUSE_HOST__
+      port: __CLICKHOUSE_PORT__
       protocol: native
       username: ${CLICKHOUSE_USER}
       defaultDatabase: faa

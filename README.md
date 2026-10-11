@@ -1,9 +1,12 @@
 # clickhouse-faadata-demo
 A ClickHouse / Grafana application that uses publicly available FAA flight and weather data.
 
-* **ClickHouse**: `xraytunnel` (HTTP 8123, native 9000), database `faa`
+* **ClickHouse**: any server you can reach over HTTP (port 8123), database `faa`
 * **Loader**: Java 21 / Maven, ClickHouse `client-v2`
-* **Dashboards**: Grafana 13 on `kolcheck` (10.13.1.142:3000) with the `grafana-clickhouse-datasource` plugin
+* **Dashboards**: Grafana with the `grafana-clickhouse-datasource` plugin, querying ClickHouse over its native protocol (port 9000)
+
+Developed with ClickHouse 26.9 and Grafana 13. The ten years of data from 2016 take about
+5 GB of downloads and about 10 GB in ClickHouse.
 
 ## Data
 
@@ -39,10 +42,15 @@ are never loaded, and owner names only for organisations, not individuals.
 
 ## Reproducing the database
 
-Needs bash, curl, python3, Java 21 and Maven.
+Needs bash, curl, python3, Java 21 and Maven, and a ClickHouse server whose user can
+create databases.
 
-    cp clickhouse.properties.example clickhouse.properties   # add the password
+    cp clickhouse.properties.example clickhouse.properties   # set clickhouse.url, user, password
     scripts/reproduce.sh 2025-01 2025-12
+
+`clickhouse.properties` is git-ignored, so credentials stay out of the repository.
+The `CLICKHOUSE_URL`, `CLICKHOUSE_USER` and `CLICKHOUSE_PASSWORD` environment variables
+override it.
 
 `reproduce.sh` runs these steps in order. Each is safe to re-run, and can be run on its own:
 
@@ -94,24 +102,40 @@ are public domain.
 
 ## Grafana
 
-Grafana runs on kolcheck (http://kolcheck:3000) and queries ClickHouse (xraytunnel:9000)
-directly. Set it up, or update it after changing `grafana/`, with:
+Grafana queries ClickHouse directly over its native protocol (port 9000), so the Grafana
+server must be able to reach the ClickHouse server. Install the
+[ClickHouse plugin](https://grafana.com/grafana/plugins/grafana-clickhouse-datasource/) first.
+
+**Automatic setup** works for a Grafana installed from the Linux packages (configuration in
+`/etc/grafana`, run by systemd as `grafana-server`) on a machine you can SSH into with a key
+and passwordless sudo. Add to `clickhouse.properties`:
+
+    grafana.ssh=user@grafana-host
+    # Only if Grafana must use a different address for ClickHouse than clickhouse.url:
+    #grafana.clickhouse.host=clickhouse-host
+
+then run, now and after changing anything in `grafana/`:
 
     scripts/grafana-provision.sh
 
-This uses SSH (`pi@kolcheck`, key login and passwordless sudo) to install the
-datasource and dashboard provider from `grafana/provisioning/`, copy
-`grafana/dashboards/*.json`, put the ClickHouse credentials in a root-only
-`/etc/grafana/faa-clickhouse.env`, and restart Grafana. The datasource is
+This installs the datasource and dashboard provider from `grafana/provisioning/`, copies
+`grafana/dashboards/*.json`, puts the ClickHouse credentials in a root-only
+`/etc/grafana/faa-clickhouse.env`, restarts Grafana and prints the dashboard links.
+`clickhouse.properties.example` lists the other settings. The datasource is
 "ClickHouse FAA" (uid `clickhouse-faa`); being provisioned, it is read-only in the UI.
+
+**Any other Grafana** (Docker, Grafana Cloud, Windows): in Connections > Data sources, add a
+ClickHouse data source with uid `clickhouse-faa`, the native protocol, port 9000 and default
+database `faa`. The uid must match, because the dashboards refer to it. Then import each file
+in `grafana/dashboards/` with Dashboards > New > Import.
 
 Dashboards (folder "FAA"):
 
 | Dashboard | Shows |
 |-----------|-------|
-| [Flight Delays](http://kolcheck:3000/d/faa-flight-delays) | On-time %, delays and cancellations over time, delay causes, airlines, hour/weekday patterns, airport map |
-| [Weather Impact](http://kolcheck:3000/d/faa-weather-impact) | Delays, cancellations and diversions by weather at origin and destination: flight category, present weather, wind, visibility, temperature; worst weather days |
-| [Aircraft Reliability](http://kolcheck:3000/d/faa-aircraft-reliability) | Per tail number: carrier-caused cancellations and delays, utilisation, out-of-service gaps, reliability by model and age; drill into one aircraft's history and registration |
+| Flight Delays (`/d/faa-flight-delays`) | On-time %, delays and cancellations over time, delay causes, airlines, hour/weekday patterns, airport map |
+| Weather Impact (`/d/faa-weather-impact`) | Delays, cancellations and diversions by weather at origin and destination: flight category, present weather, wind, visibility, temperature; worst weather days |
+| Aircraft Reliability (`/d/faa-aircraft-reliability`) | Per tail number: carrier-caused cancellations and delays, utilisation, out-of-service gaps, reliability by model and age; drill into one aircraft's history and registration |
 
 To add a dashboard: build it in Grafana, export it as JSON (Share > Export), save it in
 `grafana/dashboards/`, commit, and re-run the script.

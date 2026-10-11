@@ -11,7 +11,7 @@ prop() {
   sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$PROJECT_DIR/clickhouse.properties" | tail -1
 }
 
-CH_URL="${CLICKHOUSE_URL:-$(prop clickhouse.url)}"; CH_URL="${CH_URL:-http://xraytunnel:8123}"
+CH_URL="${CLICKHOUSE_URL:-$(prop clickhouse.url)}"; CH_URL="${CH_URL:-http://localhost:8123}"
 CH_USER="${CLICKHOUSE_USER:-$(prop clickhouse.user)}"; CH_USER="${CH_USER:-default}"
 CH_PASSWORD="${CLICKHOUSE_PASSWORD:-$(prop clickhouse.password)}"
 
