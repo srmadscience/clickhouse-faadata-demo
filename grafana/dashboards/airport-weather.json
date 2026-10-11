@@ -790,139 +790,22 @@
       }
     },
     {
-      "type": "state-timeline",
+      "type": "timeseries",
       "title": "Cloud layers",
-      "description": "Up to four cloud layers per report (skyc1-4 with heights skyl1-4), lowest first: ○ clear, ◔ few (1-2 eighths of the sky), ◑ scattered (3-4), ◕ broken (5-7), ● overcast, ⊗ sky obscured, with vertical visibility as the height. Darker = more cloud. Heights in feet above ground.",
+      "description": "Each reported cloud layer (skyc1-4 at heights skyl1-4) as a dot at its height in feet above ground, one per report, on a log scale so low cloud stands out; layer 1 is always the lowest. Bigger and brighter means more cloud: ◔ few (1-2 eighths of the sky), ◑ scattered (3-4), ◕ broken (5-7), ● overcast; ⊗ (purple) is sky obscured, with vertical visibility as the height. Clear sky has no layer. The lowest broken, overcast or obscured layer is the ceiling; the bands behind show the flight category it alone would give: LIFR below 500 ft, IFR below 1,000, MVFR to 3,000.",
       "gridPos": {
         "x": 0,
         "y": 19,
         "w": 24,
-        "h": 7
+        "h": 11
       },
       "fieldConfig": {
         "defaults": {
           "custom": {
-            "fillOpacity": 85,
-            "lineWidth": 0
-          },
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "#9FA0A8"
-          },
-          "mappings": [
-            {
-              "type": "regex",
-              "options": {
-                "pattern": "^○.*",
-                "result": {
-                  "color": "#8AB8FF",
-                  "index": 0
-                }
-              }
-            },
-            {
-              "type": "regex",
-              "options": {
-                "pattern": "^◔.*",
-                "result": {
-                  "color": "#CCCCDC",
-                  "index": 1
-                }
-              }
-            },
-            {
-              "type": "regex",
-              "options": {
-                "pattern": "^◑.*",
-                "result": {
-                  "color": "#A0A0B0",
-                  "index": 2
-                }
-              }
-            },
-            {
-              "type": "regex",
-              "options": {
-                "pattern": "^◕.*",
-                "result": {
-                  "color": "#6E6E80",
-                  "index": 3
-                }
-              }
-            },
-            {
-              "type": "regex",
-              "options": {
-                "pattern": "^●.*",
-                "result": {
-                  "color": "#464655",
-                  "index": 4
-                }
-              }
-            },
-            {
-              "type": "regex",
-              "options": {
-                "pattern": "^⊗.*",
-                "result": {
-                  "color": "#8F3BB8",
-                  "index": 5
-                }
-              }
-            }
-          ]
-        },
-        "overrides": []
-      },
-      "options": {
-        "showValue": "auto",
-        "mergeValues": true,
-        "alignValue": "center",
-        "rowHeight": 0.85,
-        "legend": {
-          "showLegend": false
-        },
-        "tooltip": {
-          "mode": "single"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "rawSql": "SELECT valid AS time,\n       multiIf(skyc1 = '', NULL, skyc1 = 'CLR', '○ Clear',\n               concat(transform(skyc1, ['FEW', 'SCT', 'BKN', 'OVC', 'VV'],\n                                ['◔ FEW', '◑ SCT', '◕ BKN', '● OVC', '⊗ VV'], skyc1),\n                      ifNull(concat(' ', toString(toUInt32(skyl1)), ' ft'), ''))) AS `Layer 1`,\n       multiIf(skyc2 = '', NULL, skyc2 = 'CLR', '○ Clear',\n               concat(transform(skyc2, ['FEW', 'SCT', 'BKN', 'OVC', 'VV'],\n                                ['◔ FEW', '◑ SCT', '◕ BKN', '● OVC', '⊗ VV'], skyc2),\n                      ifNull(concat(' ', toString(toUInt32(skyl2)), ' ft'), ''))) AS `Layer 2`,\n       multiIf(skyc3 = '', NULL, skyc3 = 'CLR', '○ Clear',\n               concat(transform(skyc3, ['FEW', 'SCT', 'BKN', 'OVC', 'VV'],\n                                ['◔ FEW', '◑ SCT', '◕ BKN', '● OVC', '⊗ VV'], skyc3),\n                      ifNull(concat(' ', toString(toUInt32(skyl3)), ' ft'), ''))) AS `Layer 3`,\n       multiIf(skyc4 = '', NULL, skyc4 = 'CLR', '○ Clear',\n               concat(transform(skyc4, ['FEW', 'SCT', 'BKN', 'OVC', 'VV'],\n                                ['◔ FEW', '◑ SCT', '◕ BKN', '● OVC', '⊗ VV'], skyc4),\n                      ifNull(concat(' ', toString(toUInt32(skyl4)), ' ft'), ''))) AS `Layer 4`\nFROM faa.weather FINAL WHERE station = '${station}' AND $__timeFilter(valid) ORDER BY time",
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "clickhouse-faa"
-          },
-          "editorType": "sql",
-          "format": 1,
-          "queryType": "table"
-        }
-      ],
-      "id": 12,
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "clickhouse-faa"
-      }
-    },
-    {
-      "type": "timeseries",
-      "title": "Cloud layer heights",
-      "description": "Height of each reported cloud layer (skyl1-4), feet above ground, on a log scale so low cloud stands out. Ceiling (dashed) is the lowest broken, overcast or obscured layer; the bands show the flight category it alone would give.",
-      "gridPos": {
-        "x": 0,
-        "y": 26,
-        "w": 24,
-        "h": 9
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "lineWidth": 1,
+            "lineWidth": 0,
             "fillOpacity": 0,
             "showPoints": "always",
             "spanNulls": false,
-            "pointSize": 4,
             "scaleDistribution": {
               "type": "log",
               "log": 10
@@ -959,94 +842,112 @@
         "overrides": [
           {
             "matcher": {
-              "id": "byName",
-              "options": "Layer 1"
+              "id": "byRegexp",
+              "options": "◔ FEW.*"
             },
             "properties": [
               {
                 "id": "color",
                 "value": {
                   "mode": "fixed",
-                  "fixedColor": "#FADE2A"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Layer 2"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#FF9830"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Layer 3"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#8AB8FF"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Layer 4"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#CA95E5"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Ceiling"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#F2495C"
+                  "fixedColor": "#7C8A9E"
                 }
               },
               {
-                "id": "custom.lineWidth",
-                "value": 2
-              },
+                "id": "custom.pointSize",
+                "value": 4
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "◑ SCT.*"
+            },
+            "properties": [
               {
-                "id": "custom.lineStyle",
+                "id": "color",
                 "value": {
-                  "fill": "dash",
-                  "dash": [
-                    10,
-                    10
-                  ]
+                  "mode": "fixed",
+                  "fixedColor": "#B0B8C4"
                 }
               },
               {
-                "id": "custom.showPoints",
-                "value": "never"
+                "id": "custom.pointSize",
+                "value": 6
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "◕ BKN.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#E0E0E0"
+                }
+              },
+              {
+                "id": "custom.pointSize",
+                "value": 8
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "● OVC.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FFFFFF"
+                }
+              },
+              {
+                "id": "custom.pointSize",
+                "value": 10
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "⊗ VV.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#B877D9"
+                }
+              },
+              {
+                "id": "custom.pointSize",
+                "value": 10
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*\\(layer [2-4]\\)"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": false,
+                  "viz": false
+                }
               }
             ]
           }
@@ -1059,14 +960,14 @@
           "placement": "bottom"
         },
         "tooltip": {
-          "mode": "multi",
+          "mode": "single",
           "sort": "none"
         }
       },
       "targets": [
         {
           "refId": "A",
-          "rawSql": "WITH arrayFilter((l, c) -> c IN ('BKN', 'OVC', 'VV') AND l IS NOT NULL,\n                   [skyl1, skyl2, skyl3, skyl4], [skyc1, skyc2, skyc3, skyc4]) AS layers,\n     if(empty(layers), NULL, arrayMin(layers)) AS ceiling,\n     multiIf(vsby IS NULL AND ceiling IS NULL AND skyc1 = '', NULL,\n             ceiling < 500 OR vsby < 1, 'LIFR',\n             ceiling < 1000 OR vsby < 3, 'IFR',\n             ceiling <= 3000 OR vsby <= 5, 'MVFR', 'VFR') AS category\nSELECT valid AS time, skyl1 AS `Layer 1`, skyl2 AS `Layer 2`, skyl3 AS `Layer 3`, skyl4 AS `Layer 4`,\n       ceiling AS Ceiling\nFROM faa.weather FINAL WHERE station = '${station}' AND $__timeFilter(valid) ORDER BY time",
+          "rawSql": "SELECT valid AS time,\n       if(skyc1 = 'FEW', skyl1, NULL) AS `◔ FEW`,\n       if(skyc1 = 'SCT', skyl1, NULL) AS `◑ SCT`,\n       if(skyc1 = 'BKN', skyl1, NULL) AS `◕ BKN`,\n       if(skyc1 = 'OVC', skyl1, NULL) AS `● OVC`,\n       if(skyc1 = 'VV', skyl1, NULL) AS `⊗ VV`,\n       if(skyc2 = 'FEW', skyl2, NULL) AS `◔ FEW (layer 2)`,\n       if(skyc2 = 'SCT', skyl2, NULL) AS `◑ SCT (layer 2)`,\n       if(skyc2 = 'BKN', skyl2, NULL) AS `◕ BKN (layer 2)`,\n       if(skyc2 = 'OVC', skyl2, NULL) AS `● OVC (layer 2)`,\n       if(skyc2 = 'VV', skyl2, NULL) AS `⊗ VV (layer 2)`,\n       if(skyc3 = 'FEW', skyl3, NULL) AS `◔ FEW (layer 3)`,\n       if(skyc3 = 'SCT', skyl3, NULL) AS `◑ SCT (layer 3)`,\n       if(skyc3 = 'BKN', skyl3, NULL) AS `◕ BKN (layer 3)`,\n       if(skyc3 = 'OVC', skyl3, NULL) AS `● OVC (layer 3)`,\n       if(skyc3 = 'VV', skyl3, NULL) AS `⊗ VV (layer 3)`,\n       if(skyc4 = 'FEW', skyl4, NULL) AS `◔ FEW (layer 4)`,\n       if(skyc4 = 'SCT', skyl4, NULL) AS `◑ SCT (layer 4)`,\n       if(skyc4 = 'BKN', skyl4, NULL) AS `◕ BKN (layer 4)`,\n       if(skyc4 = 'OVC', skyl4, NULL) AS `● OVC (layer 4)`,\n       if(skyc4 = 'VV', skyl4, NULL) AS `⊗ VV (layer 4)`\nFROM faa.weather FINAL WHERE station = '${station}' AND $__timeFilter(valid) ORDER BY time",
           "datasource": {
             "type": "grafana-clickhouse-datasource",
             "uid": "clickhouse-faa"
@@ -1076,7 +977,7 @@
           "queryType": "table"
         }
       ],
-      "id": 13,
+      "id": 12,
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse-faa"
@@ -1088,7 +989,7 @@
       "description": "Visibility in statute miles (10 = 10 or more). Bands: below 1 mi LIFR, 1-3 IFR, 3-5 MVFR.",
       "gridPos": {
         "x": 0,
-        "y": 35,
+        "y": 30,
         "w": 12,
         "h": 7
       },
@@ -1158,7 +1059,7 @@
           "queryType": "table"
         }
       ],
-      "id": 14,
+      "id": 13,
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse-faa"
@@ -1170,7 +1071,7 @@
       "description": "Temperature and dew point, °F. Where the lines meet, the air is saturated: expect fog, mist or low cloud. The dotted line is freezing.",
       "gridPos": {
         "x": 12,
-        "y": 35,
+        "y": 30,
         "w": 12,
         "h": 7
       },
@@ -1257,7 +1158,7 @@
           "queryType": "table"
         }
       ],
-      "id": 15,
+      "id": 14,
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse-faa"
@@ -1269,7 +1170,7 @@
       "description": "Most significant weather in each report: ⛈ thunderstorm, 🧊 freezing rain or drizzle, ❄ snow, sleet or hail, 🌧 rain or showers, 🌦 drizzle, 🌫 fog, ≡ mist, haze, smoke or dust. The second row is the METAR code: - light, + heavy, VC in the vicinity, SH showers, BL blowing.",
       "gridPos": {
         "x": 0,
-        "y": 42,
+        "y": 37,
         "w": 24,
         "h": 4
       },
@@ -1350,7 +1251,7 @@
           "queryType": "table"
         }
       ],
-      "id": 16,
+      "id": 15,
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse-faa"
@@ -1362,7 +1263,7 @@
       "description": "Arrows point the way the wind blows; the letters say where it blows from (↓ N is a north wind).",
       "gridPos": {
         "x": 0,
-        "y": 46,
+        "y": 41,
         "w": 24,
         "h": 3
       },
@@ -1404,7 +1305,7 @@
           "queryType": "table"
         }
       ],
-      "id": 17,
+      "id": 16,
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse-faa"
@@ -1416,7 +1317,7 @@
       "description": "Sustained wind and gusts, knots.",
       "gridPos": {
         "x": 0,
-        "y": 49,
+        "y": 44,
         "w": 12,
         "h": 7
       },
@@ -1500,7 +1401,7 @@
           "queryType": "table"
         }
       ],
-      "id": 18,
+      "id": 17,
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse-faa"
@@ -1512,7 +1413,7 @@
       "description": "Precipitation since the last hourly report, inches (bars; a trace shows as 0.0001), and altimeter setting, inHg (line, right axis). A falling altimeter usually means a low and worse weather approaching.",
       "gridPos": {
         "x": 12,
-        "y": 49,
+        "y": 44,
         "w": 12,
         "h": 7
       },
@@ -1614,7 +1515,7 @@
           "queryType": "table"
         }
       ],
-      "id": 19,
+      "id": 18,
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse-faa"
@@ -1626,7 +1527,7 @@
       "description": "Every report in the time range, newest first, as transmitted. Routine reports are issued hourly; specials (SPECI) when conditions change.",
       "gridPos": {
         "x": 0,
-        "y": 56,
+        "y": 51,
         "w": 24,
         "h": 10
       },
@@ -1715,7 +1616,7 @@
           "queryType": "table"
         }
       ],
-      "id": 20,
+      "id": 19,
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse-faa"
