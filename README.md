@@ -133,9 +133,14 @@ Dashboards (folder "FAA"):
 
 | Dashboard | Shows |
 |-----------|-------|
-| Flight Delays (`/d/faa-flight-delays`) | On-time %, delays and cancellations over time, delay causes, airlines, hour/weekday patterns, airport map |
+| Flight Delays (`/d/faa-flight-delays`) | On-time %, delays and cancellations over time, delay causes, airlines, hour/weekday patterns, airport map; top 10 least reliable city pairs and flight numbers |
 | Weather Impact (`/d/faa-weather-impact`) | Delays, cancellations and diversions by weather at origin and destination: flight category, present weather, wind, visibility, temperature; worst weather days |
-| Aircraft Reliability (`/d/faa-aircraft-reliability`) | Per tail number: carrier-caused cancellations and delays, utilisation, out-of-service gaps, reliability by model and age; drill into one aircraft's history and registration |
+| Aircraft Reliability (`/d/faa-aircraft-reliability`) | Per tail number: carrier-caused cancellations and delays, utilisation, out-of-service gaps, reliability by model and age, top 10 least reliable aircraft; drill into one aircraft's history and registration |
+
+The top-10 charts rank by carrier cancellations (cancellation code A) per 1,000 flights,
+so weather and air-traffic cancellations don't count against an airline, and only consider
+aircraft, city pairs or flight numbers with at least "Min flights flown" completed flights
+in the time range.
 
 To add a dashboard: build it in Grafana, export it as JSON (Share > Export), save it in
 `grafana/dashboards/`, commit, and re-run the script.
