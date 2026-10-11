@@ -50,13 +50,45 @@ Needs bash, curl, python3, Java 21 and Maven.
 | `create-database.sh` | Creates `faa` and the tables from `sql/` |
 | `fetch-flights.sh FROM TO` | Downloads BTS months (`YYYY-MM`) not already in `data/raw/flights/` |
 | `load-flights.sh` | Loads them, replacing each month's partition |
-| `fetch-stations.sh` / `load-stations.sh` | Refreshes IEM stations and OurAirports; lists airports with no station |
+| `fetch-stations.sh` / `load-stations.sh` | Gets IEM stations and OurAirports; lists airports with no station |
 | `fetch-weather.sh FROM TO` | Downloads IEM observations (years) for every airport in `faa.ontime` |
 | `load-weather.sh` | Loads them; duplicates are removed by the table engine |
 | `build-flight-weather.sh` | Rebuilds `flight_weather`; re-run after loading flights, stations or weather |
-| `fetch-registry.sh` / `load-registry.sh` | Downloads today's FAA registry; replaces the registry tables and `aircraft_info` |
+| `fetch-registry.sh` / `load-registry.sh` | Gets the FAA registry; replaces the registry tables and `aircraft_info` |
+
+The fetch scripts download from the project's [data mirror](#data-mirror) first and go
+to the original sources only for what it lacks, so a full rebuild takes minutes, not hours.
 
 To add more data later, run `reproduce.sh` with a wider range: existing downloads are skipped.
+New months come from BTS if the mirror doesn't have them yet. To bring the current year's
+weather, the station list or the registry up to date, use `--refresh`:
+
+    scripts/fetch-weather.sh --refresh 2026 2026
+    scripts/fetch-stations.sh --refresh
+    scripts/fetch-registry.sh --refresh
+
+## Data mirror
+
+The original sources are slow (IEM weather alone takes about 10 hours at one request at a
+time), so the raw files are also published as [GitHub Releases](https://github.com/srmadscience/clickhouse-faadata-demo/releases)
+on this repository: public, free to download, and outside git itself.
+
+| Release | Files |
+|---------|-------|
+| `data-flights` | `ontime_YYYY_MM.zip`, as downloaded from BTS |
+| `data-weather` | `weather_YYYY.tar`: that year's `YYYY/STATION.csv.gz` files |
+| `data-reference` | `stations.tar.gz` (IEM networks and OurAirports), `ReleasableAircraft_YYYYMMDD.zip` |
+
+GitHub shows each file's SHA-256 and the fetch scripts check it. `DATA_REPO=owner/repo`
+points them at a fork's releases instead, and `DATA_REPO=none` skips the mirror.
+
+After fetching new data, update the mirror with:
+
+    scripts/publish-data.sh              # DRY_RUN=1 to see what it would upload
+
+It uses the `gh` CLI and uploads only files that are new or changed. The weather data
+comes from the Iowa Environmental Mesonet, which asks to be credited; the other sources
+are public domain.
 
 ## Grafana
 
@@ -85,4 +117,5 @@ To add a dashboard: build it in Grafana, export it as JSON (Share > Export), sav
 ## Large data files
 
 The data does not live in git: the repo holds the *recipe* (the scripts above),
-and `data/manifest.sha256` can record checksums of exactly what was loaded.
+the [data mirror](#data-mirror) holds a copy of the files, and `data/manifest.sha256`
+can record checksums of exactly what was loaded.

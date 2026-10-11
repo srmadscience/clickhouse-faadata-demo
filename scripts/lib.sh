@@ -57,6 +57,32 @@ download() {
   curl -fsSL --retry 5 --retry-delay 10 -C - -o "$target.part" "$url" && mv "$target.part" "$target"
 }
 
+# Public mirror of data/raw/: GitHub Releases on this repository, published by
+# scripts/publish-data.sh. The fetch scripts try it before the original sources.
+# Set DATA_REPO=owner/repo to use a fork's releases, or DATA_REPO=none to skip it.
+DATA_REPO="${DATA_REPO:-srmadscience/clickhouse-faadata-demo}"
+
+# mirror_assets TAG: lists release TAG's files as "name<TAB>sha256<TAB>url";
+# prints nothing if the release doesn't exist or the mirror is off.
+mirror_assets() {
+  [[ "$DATA_REPO" != none ]] || return 0
+  python3 -I "$PROJECT_DIR/scripts/mirror.py" "$DATA_REPO" "$1"
+}
+
+# mirror_fetch LISTING NAME TARGET: downloads file NAME, as listed by
+# mirror_assets, to TARGET and checks its SHA-256. Fails if it isn't mirrored.
+mirror_fetch() {
+  local name sum url
+  IFS=$'\t' read -r name sum url < <(awk -F'\t' -v n="$2" '$1 == n' <<< "$1") || true
+  [[ -n "$url" ]] || return 1
+  download "$url" "$3" || { rm -f "$3.part"; return 1; }
+  if [[ "$(shasum -a 256 "$3" | cut -d' ' -f1)" != "$sum" ]]; then
+    echo "error: $name from the mirror does not match its checksum; deleted" >&2
+    rm -f "$3"
+    return 1
+  fi
+}
+
 # month_range 2024-11 2025-02 -> 2024-11 2024-12 2025-01 2025-02
 month_range() {
   local y=$((10#${1%-*})) m=$((10#${1#*-})) ey=$((10#${2%-*})) em=$((10#${2#*-}))

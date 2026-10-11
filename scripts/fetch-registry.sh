@@ -1,14 +1,33 @@
 #!/usr/bin/env bash
 # Downloads the FAA aircraft registry (ReleasableAircraft.zip, ~70 MB, updated
-# daily) into data/raw/registry/ReleasableAircraft_YYYYMMDD.zip. Skipped if
-# today's copy exists; older copies are kept so earlier loads can be redone.
+# daily) into data/raw/registry/ReleasableAircraft_YYYYMMDD.zip. If there is
+# no copy yet, the newest one on the project's mirror (GitHub Releases, see
+# lib.sh) is used, so everyone gets the same snapshot. --refresh downloads
+# today's from the FAA; older copies are kept so earlier loads can be redone.
 #
 #   scripts/fetch-registry.sh
+#   scripts/fetch-registry.sh --refresh
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 
 URL="https://registry.faa.gov/database/ReleasableAircraft.zip"
-target="$PROJECT_DIR/data/raw/registry/ReleasableAircraft_$(date -u +%Y%m%d).zip"
+DEST="$PROJECT_DIR/data/raw/registry"
+
+if [[ "${1:-}" != --refresh ]]; then
+  existing=$(ls -1 "$DEST"/ReleasableAircraft_*.zip 2>/dev/null | tail -1 || true)
+  if [[ -n "$existing" ]]; then
+    echo "skip   $(basename "$existing") (--refresh to download today's)"
+    exit 0
+  fi
+  MIRROR=$(mirror_assets data-reference)
+  name=$(awk -F'\t' '$1 ~ /^ReleasableAircraft_[0-9]+\.zip$/ {print $1}' <<< "$MIRROR" | sort | tail -1)
+  if [[ -n "$name" ]] && mirror_fetch "$MIRROR" "$name" "$DEST/$name"; then
+    echo "fetch  $name  (mirror)"
+    exit 0
+  fi
+fi
+
+target="$DEST/ReleasableAircraft_$(date -u +%Y%m%d).zip"
 if [[ -f "$target" ]]; then
   echo "skip   $(basename "$target")"
   exit 0

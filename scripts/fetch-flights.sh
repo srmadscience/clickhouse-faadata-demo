@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Downloads BTS on-time performance files (one zip per month) into data/raw/flights/.
-# Already-downloaded months are skipped, so it is safe to re-run.
+# Each month comes from the project's mirror (GitHub Releases, see lib.sh) if
+# it is there, otherwise from BTS. Already-downloaded months are skipped, so it
+# is safe to re-run.
 #
 #   scripts/fetch-flights.sh 2025-01 2025-12
 #
@@ -12,18 +14,23 @@ source "$(dirname "$0")/lib.sh"
 [[ $# -eq 2 ]] || { echo "usage: $0 FROM_YYYY-MM TO_YYYY-MM" >&2; exit 1; }
 BASE_URL="https://transtats.bts.gov/PREZIP/On_Time_Reporting_Carrier_On_Time_Performance_1987_present"
 DEST="$PROJECT_DIR/data/raw/flights"
+MIRROR=$(mirror_assets data-flights)
 
 for ym in $(month_range "$1" "$2"); do
   y=${ym%-*}; m=$((10#${ym#*-}))
-  target="$DEST/ontime_${y}_$(printf %02d "$m").zip"
+  name="ontime_${y}_$(printf %02d "$m").zip"
+  target="$DEST/$name"
   if [[ -f "$target" ]]; then
-    echo "skip   $(basename "$target")"
+    echo "skip   $name"
     continue
   fi
-  echo "fetch  $(basename "$target")"
-  if ! download "${BASE_URL}_${y}_${m}.zip" "$target"; then
+  if mirror_fetch "$MIRROR" "$name" "$target"; then
+    echo "fetch  $name  (mirror)"
+  elif download "${BASE_URL}_${y}_${m}.zip" "$target"; then
+    echo "fetch  $name  (BTS)"
+  else
     rm -f "$target.part"
-    echo "       not available from BTS (yet?)" >&2
+    echo "       $name: not available from BTS (yet?)" >&2
     continue
   fi
   unzip -tq "$target" > /dev/null || { echo "error: $target is corrupt; deleted" >&2; rm -f "$target"; exit 1; }

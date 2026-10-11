@@ -3,7 +3,9 @@
 Everything here except this README, `manifest.sha256` and the `.gitkeep`
 placeholders is git-ignored. **Never commit data files.** The scripts in
 `scripts/` are the record of where the data comes from; re-running them
-re-creates this directory.
+re-creates this directory, from the project's GitHub Releases mirror where it
+has the files and from the original sources otherwise (see the main README).
+`publish/` holds the archives `scripts/publish-data.sh` builds for the mirror.
 
 | Path | Source | Fetched by |
 |------|--------|------------|

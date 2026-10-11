@@ -1,26 +1,39 @@
 #!/usr/bin/env bash
 # Downloads IEM ASOS observations, one gzipped CSV per station per year, into
-# data/raw/weather/YEAR/STATION.csv.gz. By default the stations for each year
-# are those of the airports flown that year in faa.ontime, via
-# faa.airport_station (so load flights and stations first). Completed years are
-# skipped if present; the current year is always re-fetched as it is still growing.
+# data/raw/weather/YEAR/STATION.csv.gz. A year not downloaded yet is first
+# unpacked from the project's mirror (GitHub Releases, see lib.sh), if it has
+# that year. Then any station still missing is fetched from IEM: by default the
+# stations for each year are those of the airports flown that year in
+# faa.ontime, via faa.airport_station (so load flights and stations first).
+# Existing files are kept; --refresh fetches every station again from IEM, e.g.
+# to bring the current year up to date.
 #
 #   scripts/fetch-weather.sh 2025 2025
 #   scripts/fetch-weather.sh 2025 2025 ORD JFK
+#   scripts/fetch-weather.sh --refresh 2026 2026
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 
-[[ $# -ge 2 ]] || { echo "usage: $0 FROM_YEAR TO_YEAR [STATION...]" >&2; exit 1; }
+refresh=0
+[[ "${1:-}" == --refresh ]] && { refresh=1; shift; }
+[[ $# -ge 2 ]] || { echo "usage: $0 [--refresh] FROM_YEAR TO_YEAR [STATION...]" >&2; exit 1; }
 from=$1; to=$2; shift 2
 given=("$@")
 [[ ${#given[@]} -gt 0 ]] || ch_check_connection
 
-this_year=$(date -u +%Y)
+DEST="$PROJECT_DIR/data/raw/weather"
+MIRROR=""
+[[ $refresh -eq 1 ]] || MIRROR=$(mirror_assets data-weather)
 IEM="https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py"
 # report_type 3/4 = routine + special METARs. trace=0.0001 keeps p01i numeric.
 PARAMS="data=all&tz=Etc/UTC&format=onlycomma&latlon=yes&elev=yes&missing=empty&trace=0.0001&direct=no&report_type=3&report_type=4"
 
 for year in $(seq "$from" "$to"); do
+  if [[ ! -d "$DEST/$year" ]] && mirror_fetch "$MIRROR" "weather_$year.tar" "$DEST/weather_$year.tar"; then
+    tar -xf "$DEST/weather_$year.tar" -C "$DEST"
+    rm "$DEST/weather_$year.tar"
+    echo "$year: $(ls "$DEST/$year" | wc -l | tr -d ' ') stations from the mirror"
+  fi
   if [[ ${#given[@]} -gt 0 ]]; then
     stations=("${given[@]}")
   else
@@ -31,11 +44,11 @@ for year in $(seq "$from" "$to"); do
                         SELECT Dest FROM faa.ontime WHERE toYear(FlightDate) = $year)
       ORDER BY station"))
   fi
-  echo "$year: ${#stations[@]} stations"
+  echo "$year: ${#stations[@]} stations needed"
 
   for st in "${stations[@]}"; do
-    target="$PROJECT_DIR/data/raw/weather/$year/$st.csv.gz"
-    if [[ -f "$target" && $year -lt $this_year ]]; then
+    target="$DEST/$year/$st.csv.gz"
+    if [[ -f "$target" && $refresh -eq 0 ]]; then
       continue
     fi
     rm -f "$target"
