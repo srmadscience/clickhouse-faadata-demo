@@ -1,3 +1,17 @@
+# Copyright 2026 David Rolfe
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # Shared helpers, sourced by the other scripts. Not meant to be run directly.
 #
 # Connection settings come from CLICKHOUSE_URL / CLICKHOUSE_USER /
@@ -14,6 +28,9 @@ prop() {
 CH_URL="${CLICKHOUSE_URL:-$(prop clickhouse.url)}"; CH_URL="${CH_URL:-http://localhost:8123}"
 CH_USER="${CLICKHOUSE_USER:-$(prop clickhouse.user)}"; CH_USER="${CH_USER:-default}"
 CH_PASSWORD="${CLICKHOUSE_PASSWORD:-$(prop clickhouse.password)}"
+# The Java loader reads these first, so it connects to the same server whatever
+# directory the scripts are run from.
+export CLICKHOUSE_URL="$CH_URL" CLICKHOUSE_USER="$CH_USER" CLICKHOUSE_PASSWORD="$CH_PASSWORD"
 
 # ch_query SQL [curl args...]: run one statement over HTTP, print the result.
 # The password goes in a header, not the URL, so it never shows up in logs.
