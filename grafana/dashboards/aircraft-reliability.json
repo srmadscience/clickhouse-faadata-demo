@@ -928,6 +928,101 @@
       "id": 12
     },
     {
+      "type": "barchart",
+      "title": "Top 10 least reliable aircraft",
+      "description": "The ten aircraft with the most carrier cancellations per 1,000 flights, among those that flew at least the minimum number of flights; ties go to the one with more carrier delay per flight. The table below has the details. Click a bar to inspect that aircraft.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-faa"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 31,
+        "w": 24,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 0,
+            "axisLabel": "Carrier cancellations per 1,000 flights"
+          },
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "red"
+          },
+          "min": 0,
+          "links": [
+            {
+              "title": "Show this aircraft",
+              "url": "/d/faa-aircraft-reliability/aircraft-reliability?${__url_time_range}&${airline:queryparam}&${min_flights:queryparam}&var-tail=${__data.fields.Tail}"
+            }
+          ]
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "delay"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "viz": true,
+                  "legend": true,
+                  "tooltip": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tail"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "viz": true,
+                  "legend": true,
+                  "tooltip": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "xField": "Aircraft",
+        "orientation": "horizontal",
+        "showValue": "always",
+        "legend": {
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single"
+        },
+        "barWidth": 0.8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-faa"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "SELECT concat(tail, ' (', any(Reporting_Airline), ')') AS Aircraft, tail AS Tail,\n       round(1000 * sum(cxl_carrier) / sum(flights), 1) AS `Carrier cxl / 1k flights`,\n       round(sum(carrier_delay) / sum(completed), 1) AS delay,\n       -- as text, so they appear in the tooltip without being drawn as bars\n       toString(sum(flights)) AS Flights, toString(delay) AS `Carrier delay min/flt`\nFROM faa.tail_day WHERE $__dateFilter(FlightDate) AND Reporting_Airline IN (${airline:singlequote}) AND tail != ''\nGROUP BY tail HAVING sum(completed) >= ${min_flights}\nORDER BY `Carrier cxl / 1k flights` DESC, delay DESC\nLIMIT 10"
+        }
+      ],
+      "id": 24
+    },
+    {
       "type": "table",
       "title": "Least reliable aircraft",
       "description": "Aircraft that flew at least the minimum number of flights, worst carrier-cancellation rate first. Cxl = carrier cancellations; Cxl/1k = per 1,000 flights; Delay min/flt = carrier delay minutes per completed flight; Longest gap = longest run of days without a flight (often heavy maintenance or storage). Click a tail to inspect it below.",
@@ -937,7 +1032,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 31,
+        "y": 40,
         "w": 24,
         "h": 11
       },
@@ -1102,7 +1197,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 42,
+        "y": 51,
         "w": 24,
         "h": 1
       },
@@ -1119,7 +1214,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 43,
+        "y": 52,
         "w": 24,
         "h": 3
       },
@@ -1173,7 +1268,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 46,
+        "y": 55,
         "w": 4,
         "h": 4
       },
@@ -1234,7 +1329,7 @@
       },
       "gridPos": {
         "x": 4,
-        "y": 46,
+        "y": 55,
         "w": 4,
         "h": 4
       },
@@ -1303,7 +1398,7 @@
       },
       "gridPos": {
         "x": 8,
-        "y": 46,
+        "y": 55,
         "w": 4,
         "h": 4
       },
@@ -1364,7 +1459,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 46,
+        "y": 55,
         "w": 4,
         "h": 4
       },
@@ -1425,7 +1520,7 @@
       },
       "gridPos": {
         "x": 16,
-        "y": 46,
+        "y": 55,
         "w": 4,
         "h": 4
       },
@@ -1486,7 +1581,7 @@
       },
       "gridPos": {
         "x": 20,
-        "y": 46,
+        "y": 55,
         "w": 4,
         "h": 4
       },
@@ -1547,7 +1642,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 50,
+        "y": 59,
         "w": 24,
         "h": 8
       },
@@ -1645,7 +1740,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 58,
+        "y": 67,
         "w": 24,
         "h": 11
       },
