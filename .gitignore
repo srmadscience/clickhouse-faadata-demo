@@ -44,3 +44,6 @@ data/**
 # Local credentials
 clickhouse.properties
 .env
+
+# Load timings, appended by scripts/reproduce.sh --time
+!/testresults_load.csv

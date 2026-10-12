@@ -105,6 +105,14 @@ A full load of January 2016 to July 2026 from an empty server, timed in October 
 Downloading takes over half the time and depends on the connection. The result is 197
 million rows: 41 GB of data, stored in 10 GB.
 
+To time a load from scratch, drop the `faa` database and move the downloaded files out of
+`data/raw/`, then run:
+
+    scripts/reproduce.sh --time 2016-01 2026-07
+
+This appends each step's time to [`testresults_load.csv`](testresults_load.csv), with the
+date, git commit and ClickHouse version, so runs can be compared.
+
 ## Data mirror
 
 The original sources are slow (IEM weather alone takes about 10 hours at one request at a

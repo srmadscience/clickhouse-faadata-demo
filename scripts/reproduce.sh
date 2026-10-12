@@ -18,19 +18,45 @@
 # Every step is idempotent, so this is also the way to extend the date range.
 #
 #   scripts/reproduce.sh 2025-01 2025-12
+#   scripts/reproduce.sh --time 2016-01 2026-07
+#
+# --time appends each step's duration, and the total, to testresults_load.csv,
+# with the date, git commit and ClickHouse version. For a full-load test, start
+# from an empty server (DROP DATABASE faa) and an empty data/raw/.
 set -euo pipefail
 cd "$(dirname "$0")"
 
-[[ $# -eq 2 ]] || { echo "usage: $0 FROM_YYYY-MM TO_YYYY-MM" >&2; exit 1; }
+time=0
+[[ "${1:-}" == --time ]] && { time=1; shift; }
+[[ $# -eq 2 ]] || { echo "usage: $0 [--time] FROM_YYYY-MM TO_YYYY-MM" >&2; exit 1; }
 
-./create-database.sh
-./fetch-flights.sh "$1" "$2"
-./load-flights.sh
-./build-tail-day.sh
-./fetch-stations.sh
-./load-stations.sh
-./fetch-weather.sh "${1%-*}" "${2%-*}"
-./load-weather.sh
-./build-flight-weather.sh
-./fetch-registry.sh
-./load-registry.sh
+if [[ $time -eq 1 ]]; then
+  source ./lib.sh
+  RESULTS="$PROJECT_DIR/testresults_load.csv"
+  [[ -f "$RESULTS" ]] || echo "run_start,git_commit,clickhouse_version,from,to,step,seconds" > "$RESULTS"
+  run_start=$(date '+%Y-%m-%dT%H:%M:%S%z')
+  commit=$(git -C "$PROJECT_DIR" rev-parse --short HEAD)
+  [[ -z "$(git -C "$PROJECT_DIR" status --porcelain -- . ":!testresults_load.csv")" ]] || commit+="-dirty"
+  version=$(ch_query 'SELECT version()')
+fi
+
+# step SCRIPT [ARGS...]: runs one step, recording its duration with --time.
+step() {
+  local t0=$SECONDS
+  "./$1" "${@:2}"
+  [[ $time -eq 0 ]] || echo "$run_start,$commit,$version,$FROM,$TO,${1%.sh},$((SECONDS - t0))" >> "$RESULTS"
+}
+
+FROM=$1; TO=$2
+step create-database.sh
+step fetch-flights.sh "$FROM" "$TO"
+step load-flights.sh
+step build-tail-day.sh
+step fetch-stations.sh
+step load-stations.sh
+step fetch-weather.sh "${FROM%-*}" "${TO%-*}"
+step load-weather.sh
+step build-flight-weather.sh
+step fetch-registry.sh
+step load-registry.sh
+[[ $time -eq 0 ]] || echo "$run_start,$commit,$version,$FROM,$TO,total,$SECONDS" >> "$RESULTS"
