@@ -3,3 +3,4 @@ run_start,git_commit,clickhouse_version,workload,rate,threads,seconds,queries,er
 2026-10-12T15:13:06+0100,f300c35-dirty,26.9.14.10,flight-history,max,8,60,218,0,3.6,425.3,7857.0,14458.5,16326.5,"by_tail projection on ontime (SELECT * ORDER BY tail, FlightDate)"
 2026-10-12T15:14:51+0100,f300c35-dirty,26.9.14.10,flight-history,max,8,60,2484,0,41.4,76.8,514.1,1448.3,2674.0,"by_tail projection, used: optimize_read_in_order=0 in the query"
 2026-10-12T14:34:33+0000,f2cdde8,26.9.16.11,flight-history,max,8,60,5512,0,91.9,28.0,247.1,705.5,1161.5,"m7i.2xlarge test stack, by_tail projection; benchmark run on the server itself"
+2026-10-12T16:26:25+0100,da2b505,26.9.14.10,flight-history,20.0,32,60,1200,0,20.0,20.4,168.4,488.9,814.0,"Rate-limited at 20 queries/s, by_tail projection"

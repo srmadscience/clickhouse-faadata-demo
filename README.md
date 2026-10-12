@@ -166,6 +166,12 @@ The same test on the AWS m7i.2xlarge with the projection, run on the server itse
 91.9 queries a second: p50 / p99 of 12 ms / 44 ms for up to a week, and 169 ms / 869 ms
 for 1 to 10 years.
 
+At a steady 20 queries a second, about half what xraytunnel manages flat out, it keeps up
+easily: 13 ms / 28 ms for up to a week, 117 ms / 631 ms for 1 to 10 years, and a p99 of
+489 ms overall, against 1.4 s when it is saturated.
+
+    scripts/bench-queries.sh flight-history --rate 20 --threads 32 --duration 60
+
 - **Ordered by date.** `faa.ontime` is ordered by date, not by aircraft. To find one
   aircraft's flights, every flight in the range is read and `tail` is computed for each,
   so the cost grows with the length of the range.
