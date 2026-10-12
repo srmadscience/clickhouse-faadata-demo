@@ -37,6 +37,7 @@ data/**
 !data/raw/*/
 !data/raw/*/.gitkeep
 *.csv
+!testresults_*.csv
 *.csv.gz
 *.parquet
 *.tsv

@@ -61,6 +61,11 @@ public record ClickHouseConfig(String endpoint, String user, String password, St
     }
 
     public Client newClient() {
+        return clientBuilder().build();
+    }
+
+    /** The settings every client shares, for callers that need more. */
+    public Client.Builder clientBuilder() {
         return new Client.Builder()
                 .addEndpoint(endpoint)
                 .setUsername(user)
@@ -72,7 +77,6 @@ public record ClickHouseConfig(String endpoint, String user, String password, St
                 .useHttpCompression(true)
                 // Uploads go uncompressed: the client's pure-Java LZ4 encoder
                 // manages ~0.3 MB/s, far slower than a LAN to the server.
-                .compressClientRequest(false)
-                .build();
+                .compressClientRequest(false);
     }
 }

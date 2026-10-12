@@ -35,7 +35,7 @@ are never loaded, and owner names only for organisations, not individuals.
 
 ## Layout
 
-    src/main/java/...      Loader: ping | schema | load (streams CSV / .gz / .zip)
+    src/main/java/...      Loader: ping | schema | load (streams CSV / .gz / .zip) | bench (query timing)
     sql/                   Table definitions, run in file-name order
     scripts/               Everything needed to rebuild the database and Grafana (below)
     aws/                   CloudFormation template for a complete demo server (below)
@@ -122,6 +122,42 @@ To time a load from scratch, drop the `faa` database and move the downloaded fil
 
 This appends each step's time to [`testresults_load.csv`](testresults_load.csv), with the
 date, git commit, ClickHouse version and the comment, so runs can be compared.
+
+## Query performance
+
+`scripts/bench-queries.sh` runs randomly generated queries against the loaded database,
+many at once, and times each one until its last row has been read. So far there is one
+workload. `flight-history` fetches every flight of one aircraft, picked at random from the
+9,605 that have flown, between two random dates 1 day to 10 years apart. The length of the
+range is spread evenly on a log scale, so days, weeks, months and years are equally likely.
+
+    scripts/bench-queries.sh flight-history --threads 8 --duration 60     # as fast as possible
+    scripts/bench-queries.sh flight-history --rate 5 --duration 60        # 5 queries a second
+
+- **Without `--rate`**, each of the threads runs queries back to back. This measures the
+  most the server can do.
+- **With `--rate`**, queries start on schedule, whatever happened to the earlier ones.
+  Each query is timed from when it was due to start, so when the server falls behind,
+  the latencies grow instead of the rate quietly dropping.
+
+The results are latency percentiles, overall and by length of range. `--log FILE` writes
+one line per query, and `--seed N` repeats an earlier run's queries. Add `--time
+"what changed"` before the workload to append a summary to
+[`testresults_query.csv`](testresults_query.csv), as `reproduce.sh` does for loads.
+
+The first test ran 8 threads back to back, from the M2 against xraytunnel, and managed
+5.7 queries a second:
+
+| Range | p50 | p90 | p99 | Flights returned |
+| --- | ---: | ---: | ---: | ---: |
+| 1 to 7 days | 54 ms | 128 ms | 278 ms | 6 |
+| 8 to 31 days | 124 ms | 254 ms | 358 ms | 28 |
+| 1 to 12 months | 281 ms | 1.5 s | 6.8 s | 228 |
+| 1 to 10 years | 3.2 s | 9.8 s | 19.4 s | 2,629 |
+
+The cost grows with the length of the range because `faa.ontime` is ordered by date, not
+by aircraft. Every flight in the range is read to find one aircraft's flights, and `tail`
+is computed for each of them.
 
 ## Data mirror
 

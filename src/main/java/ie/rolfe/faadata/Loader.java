@@ -58,6 +58,7 @@ import com.clickhouse.data.ClickHouseFormat;
  *   load &lt;table&gt; [--set k=v]... [--combine | --binary] [--jobs N] &lt;path&gt;...
  *                                 stream CSV files (plain, .gz or .zip) into a table,
  *                                 applying ClickHouse settings to each insert
+ *   bench &lt;workload&gt; [options]     time randomly generated queries (see {@link QueryBench})
  * </pre>
  *
  * Files are streamed straight from disk to ClickHouse, so memory use is
@@ -79,6 +80,10 @@ public class Loader {
             return;
         }
         ClickHouseConfig config = ClickHouseConfig.load();
+        if (args[0].equals("bench")) {
+            QueryBench.run(config, List.of(args).subList(1, args.length));
+            return;
+        }
         try (Client client = config.newClient()) {
             switch (args[0]) {
                 case "ping" -> ping(client, config);
@@ -99,7 +104,8 @@ public class Loader {
     }
 
     private static void usage() {
-        System.err.println("usage: Loader ping | schema <file.sql>... | load <table> [--set k=v]... [--combine | --binary] [--jobs N] <file-or-dir>...");
+        System.err.println("usage: Loader ping | schema <file.sql>... | load <table> [--set k=v]... [--combine | --binary] [--jobs N] <file-or-dir>...\n"
+                + "     | bench flight-history [--rate Q] [--threads N] [--duration S] [--timeout S] [--seed N] [--log file.csv]");
     }
 
     private static void ping(Client client, ClickHouseConfig config) throws Exception {
