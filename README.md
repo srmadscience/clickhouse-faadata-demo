@@ -108,10 +108,10 @@ million rows: 41 GB of data, stored in 10 GB.
 To time a load from scratch, drop the `faa` database and move the downloaded files out of
 `data/raw/`, then run:
 
-    scripts/reproduce.sh --time 2016-01 2026-07
+    scripts/reproduce.sh --time "what changed since the last test" 2016-01 2026-07
 
 This appends each step's time to [`testresults_load.csv`](testresults_load.csv), with the
-date, git commit and ClickHouse version, so runs can be compared.
+date, git commit, ClickHouse version and the comment, so runs can be compared.
 
 ## Data mirror
 

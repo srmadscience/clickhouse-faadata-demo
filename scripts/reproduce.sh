@@ -18,22 +18,27 @@
 # Every step is idempotent, so this is also the way to extend the date range.
 #
 #   scripts/reproduce.sh 2025-01 2025-12
-#   scripts/reproduce.sh --time 2016-01 2026-07
+#   scripts/reproduce.sh --time "parallel downloads" 2016-01 2026-07
 #
-# --time appends each step's duration, and the total, to testresults_load.csv,
-# with the date, git commit and ClickHouse version. For a full-load test, start
-# from an empty server (DROP DATABASE faa) and an empty data/raw/.
+# --time COMMENT appends each step's duration, and the total, to
+# testresults_load.csv, with the date, git commit, ClickHouse version and
+# COMMENT, which says what changed since the last test. For a full-load test,
+# start from an empty server (DROP DATABASE faa) and an empty data/raw/.
 set -euo pipefail
 cd "$(dirname "$0")"
 
 time=0
-[[ "${1:-}" == --time ]] && { time=1; shift; }
-[[ $# -eq 2 ]] || { echo "usage: $0 [--time] FROM_YYYY-MM TO_YYYY-MM" >&2; exit 1; }
+if [[ "${1:-}" == --time ]]; then
+  [[ -n "${2:-}" ]] || { echo "error: --time needs a comment saying what changed" >&2; exit 1; }
+  time=1; comment=$2; shift 2
+fi
+[[ $# -eq 2 ]] || { echo "usage: $0 [--time COMMENT] FROM_YYYY-MM TO_YYYY-MM" >&2; exit 1; }
 
 if [[ $time -eq 1 ]]; then
   source ./lib.sh
   RESULTS="$PROJECT_DIR/testresults_load.csv"
-  [[ -f "$RESULTS" ]] || echo "run_start,git_commit,clickhouse_version,from,to,step,seconds" > "$RESULTS"
+  [[ -f "$RESULTS" ]] || echo "run_start,git_commit,clickhouse_version,from,to,step,seconds,comment" > "$RESULTS"
+  comment="\"${comment//\"/\"\"}\""   # CSV-quoted
   run_start=$(date '+%Y-%m-%dT%H:%M:%S%z')
   commit=$(git -C "$PROJECT_DIR" rev-parse --short HEAD)
   [[ -z "$(git -C "$PROJECT_DIR" status --porcelain -- . ":!testresults_load.csv")" ]] || commit+="-dirty"
@@ -44,7 +49,7 @@ fi
 step() {
   local t0=$SECONDS
   "./$1" "${@:2}"
-  [[ $time -eq 0 ]] || echo "$run_start,$commit,$version,$FROM,$TO,${1%.sh},$((SECONDS - t0))" >> "$RESULTS"
+  [[ $time -eq 0 ]] || echo "$run_start,$commit,$version,$FROM,$TO,${1%.sh},$((SECONDS - t0)),$comment" >> "$RESULTS"
 }
 
 FROM=$1; TO=$2
@@ -59,4 +64,4 @@ step load-weather.sh
 step build-flight-weather.sh
 step fetch-registry.sh
 step load-registry.sh
-[[ $time -eq 0 ]] || echo "$run_start,$commit,$version,$FROM,$TO,total,$SECONDS" >> "$RESULTS"
+[[ $time -eq 0 ]] || echo "$run_start,$commit,$version,$FROM,$TO,total,$SECONDS,$comment" >> "$RESULTS"

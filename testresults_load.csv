@@ -1,25 +1,25 @@
-run_start,git_commit,clickhouse_version,from,to,step,seconds
-2026-10-11T15:04:18+0100,00c8ab4,26.9.14.10,2016-01,2026-07,create-database,1
-2026-10-11T15:04:18+0100,00c8ab4,26.9.14.10,2016-01,2026-07,fetch-flights,825
-2026-10-11T15:04:18+0100,00c8ab4,26.9.14.10,2016-01,2026-07,load-flights,655
-2026-10-11T15:04:18+0100,00c8ab4,26.9.14.10,2016-01,2026-07,build-tail-day,23
-2026-10-11T15:04:18+0100,00c8ab4,26.9.14.10,2016-01,2026-07,fetch-stations,2
-2026-10-11T15:04:18+0100,00c8ab4,26.9.14.10,2016-01,2026-07,load-stations,1
-2026-10-11T15:04:18+0100,00c8ab4,26.9.14.10,2016-01,2026-07,fetch-weather,229
-2026-10-11T15:04:18+0100,00c8ab4,26.9.14.10,2016-01,2026-07,load-weather,184
-2026-10-11T15:04:18+0100,00c8ab4,26.9.14.10,2016-01,2026-07,build-flight-weather,171
-2026-10-11T15:04:18+0100,00c8ab4,26.9.14.10,2016-01,2026-07,fetch-registry,9
-2026-10-11T15:04:18+0100,00c8ab4,26.9.14.10,2016-01,2026-07,load-registry,9
-2026-10-11T15:04:18+0100,00c8ab4,26.9.14.10,2016-01,2026-07,total,2109
-2026-10-12T08:39:05+0100,be77de8,26.9.14.10,2016-01,2026-07,create-database,0
-2026-10-12T08:39:05+0100,be77de8,26.9.14.10,2016-01,2026-07,fetch-flights,854
-2026-10-12T08:39:05+0100,be77de8,26.9.14.10,2016-01,2026-07,load-flights,628
-2026-10-12T08:39:05+0100,be77de8,26.9.14.10,2016-01,2026-07,build-tail-day,22
-2026-10-12T08:39:05+0100,be77de8,26.9.14.10,2016-01,2026-07,fetch-stations,2
-2026-10-12T08:39:05+0100,be77de8,26.9.14.10,2016-01,2026-07,load-stations,1
-2026-10-12T08:39:05+0100,be77de8,26.9.14.10,2016-01,2026-07,fetch-weather,215
-2026-10-12T08:39:05+0100,be77de8,26.9.14.10,2016-01,2026-07,load-weather,164
-2026-10-12T08:39:05+0100,be77de8,26.9.14.10,2016-01,2026-07,build-flight-weather,161
-2026-10-12T08:39:05+0100,be77de8,26.9.14.10,2016-01,2026-07,fetch-registry,9
-2026-10-12T08:39:05+0100,be77de8,26.9.14.10,2016-01,2026-07,load-registry,9
-2026-10-12T08:39:05+0100,be77de8,26.9.14.10,2016-01,2026-07,total,2065
+run_start,git_commit,clickhouse_version,from,to,step,seconds,comment
+2026-10-11T15:04:18+0100,00c8ab4,26.9.14.10,2016-01,2026-07,create-database,1,"First full load from an empty server"
+2026-10-11T15:04:18+0100,00c8ab4,26.9.14.10,2016-01,2026-07,fetch-flights,825,"First full load from an empty server"
+2026-10-11T15:04:18+0100,00c8ab4,26.9.14.10,2016-01,2026-07,load-flights,655,"First full load from an empty server"
+2026-10-11T15:04:18+0100,00c8ab4,26.9.14.10,2016-01,2026-07,build-tail-day,23,"First full load from an empty server"
+2026-10-11T15:04:18+0100,00c8ab4,26.9.14.10,2016-01,2026-07,fetch-stations,2,"First full load from an empty server"
+2026-10-11T15:04:18+0100,00c8ab4,26.9.14.10,2016-01,2026-07,load-stations,1,"First full load from an empty server"
+2026-10-11T15:04:18+0100,00c8ab4,26.9.14.10,2016-01,2026-07,fetch-weather,229,"First full load from an empty server"
+2026-10-11T15:04:18+0100,00c8ab4,26.9.14.10,2016-01,2026-07,load-weather,184,"First full load from an empty server"
+2026-10-11T15:04:18+0100,00c8ab4,26.9.14.10,2016-01,2026-07,build-flight-weather,171,"First full load from an empty server"
+2026-10-11T15:04:18+0100,00c8ab4,26.9.14.10,2016-01,2026-07,fetch-registry,9,"First full load from an empty server"
+2026-10-11T15:04:18+0100,00c8ab4,26.9.14.10,2016-01,2026-07,load-registry,9,"First full load from an empty server"
+2026-10-11T15:04:18+0100,00c8ab4,26.9.14.10,2016-01,2026-07,total,2109,"First full load from an empty server"
+2026-10-12T08:39:05+0100,be77de8,26.9.14.10,2016-01,2026-07,create-database,0,"Same load again, to check the times repeat"
+2026-10-12T08:39:05+0100,be77de8,26.9.14.10,2016-01,2026-07,fetch-flights,854,"Same load again, to check the times repeat"
+2026-10-12T08:39:05+0100,be77de8,26.9.14.10,2016-01,2026-07,load-flights,628,"Same load again, to check the times repeat"
+2026-10-12T08:39:05+0100,be77de8,26.9.14.10,2016-01,2026-07,build-tail-day,22,"Same load again, to check the times repeat"
+2026-10-12T08:39:05+0100,be77de8,26.9.14.10,2016-01,2026-07,fetch-stations,2,"Same load again, to check the times repeat"
+2026-10-12T08:39:05+0100,be77de8,26.9.14.10,2016-01,2026-07,load-stations,1,"Same load again, to check the times repeat"
+2026-10-12T08:39:05+0100,be77de8,26.9.14.10,2016-01,2026-07,fetch-weather,215,"Same load again, to check the times repeat"
+2026-10-12T08:39:05+0100,be77de8,26.9.14.10,2016-01,2026-07,load-weather,164,"Same load again, to check the times repeat"
+2026-10-12T08:39:05+0100,be77de8,26.9.14.10,2016-01,2026-07,build-flight-weather,161,"Same load again, to check the times repeat"
+2026-10-12T08:39:05+0100,be77de8,26.9.14.10,2016-01,2026-07,fetch-registry,9,"Same load again, to check the times repeat"
+2026-10-12T08:39:05+0100,be77de8,26.9.14.10,2016-01,2026-07,load-registry,9,"Same load again, to check the times repeat"
+2026-10-12T08:39:05+0100,be77de8,26.9.14.10,2016-01,2026-07,total,2065,"Same load again, to check the times repeat"
