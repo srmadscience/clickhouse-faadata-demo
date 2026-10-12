@@ -110,7 +110,9 @@ at a time, and downloads come from the [data mirror](#data-mirror), four files a
 
 At home, downloading takes over half the time. On AWS it is much faster, but with four
 vCPUs parsing the flight CSVs is slower, as the loader shares them with ClickHouse
-instead of having the M2's eight cores to itself; with eight it matches the M2. Either way, the result is 197 million rows: 41 GB
+instead of having the M2's eight cores to itself; with eight it matches the M2. Doubling
+again to an m7i.4xlarge (16 vCPUs) barely helps: everything but the downloads took 199 s,
+against 225 s on 8 vCPUs, all of it saved in `load-flights`, so 8 vCPUs is the better buy. Either way, the result is 197 million rows: 41 GB
 of data, stored in 10 GB, and the tables are identical.
 
 To time a load from scratch, drop the `faa` database and move the downloaded files out of

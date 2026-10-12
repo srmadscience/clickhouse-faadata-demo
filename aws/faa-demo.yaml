@@ -26,7 +26,7 @@ Parameters:
   InstanceType:
     Type: String
     Default: m7i.xlarge
-    AllowedValues: [m7i.large, m7i.xlarge, m7i.2xlarge, r7i.large, r7i.xlarge, r7i.2xlarge, t3.xlarge, t3.2xlarge]
+    AllowedValues: [m7i.large, m7i.xlarge, m7i.2xlarge, m7i.4xlarge, r7i.large, r7i.xlarge, r7i.2xlarge, t3.xlarge, t3.2xlarge]
     Description: x86_64 instance type; 16 GB of memory or more is recommended
   VolumeSize:
     Type: Number
