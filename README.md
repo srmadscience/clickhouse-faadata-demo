@@ -95,18 +95,18 @@ three setups:
 Both used ClickHouse 26.9 and Java 21. The loader parses the flight CSVs itself, 8 files
 at a time, and downloads come from the [data mirror](#data-mirror), four files at a time.
 
-| Step | Home | AWS, 4 vCPUs | AWS, 8 vCPUs |
-|------|-----:|-----:|-----:|
-| `create-database.sh` | 1 s | 0 s | 0 s |
-| `fetch-flights.sh 2016-01 2026-07` (127 months, 3.3 GB) | 7 min 11 s | 2 min 28 s | 2 min 16 s |
-| `load-flights.sh` (68.4 million flights) | 1 min 27 s | 3 min 3 s | 1 min 26 s |
-| `build-tail-day.sh` | 21 s | 12 s | 8 s |
-| `fetch-stations.sh` / `load-stations.sh` | 3 s | 2 s | 2 s |
-| `fetch-weather.sh 2016 2026` (11 years, 1.6 GB) | 2 min 55 s | 13 s | 12 s |
-| `load-weather.sh` (42.2 million reports) | 2 min 46 s | 1 min 25 s | 58 s |
-| `build-flight-weather.sh` | 2 min 43 s | 1 min 35 s | 1 min 9 s |
-| `fetch-registry.sh` / `load-registry.sh` | 24 s | 6 s | 5 s |
-| **Total** | **17 min 51 s** | **9 min 4 s** | **6 min 16 s** |
+| Step | Home | AWS, 4 vCPUs | AWS, 8 vCPUs | AWS, 8 vCPUs, with `by_tail` |
+|------|-----:|-----:|-----:|-----:|
+| `create-database.sh` | 1 s | 0 s | 0 s | 0 s |
+| `fetch-flights.sh 2016-01 2026-07` (127 months, 3.3 GB) | 7 min 11 s | 2 min 28 s | 2 min 16 s | 2 min 23 s |
+| `load-flights.sh` (68.4 million flights) | 1 min 27 s | 3 min 3 s | 1 min 26 s | 1 min 39 s |
+| `build-tail-day.sh` | 21 s | 12 s | 8 s | 9 s |
+| `fetch-stations.sh` / `load-stations.sh` | 3 s | 2 s | 2 s | 1 s |
+| `fetch-weather.sh 2016 2026` (11 years, 1.6 GB) | 2 min 55 s | 13 s | 12 s | 14 s |
+| `load-weather.sh` (42.2 million reports) | 2 min 46 s | 1 min 25 s | 58 s | 1 min 0 s |
+| `build-flight-weather.sh` | 2 min 43 s | 1 min 35 s | 1 min 9 s | 1 min 10 s |
+| `fetch-registry.sh` / `load-registry.sh` | 24 s | 6 s | 5 s | 6 s |
+| **Total** | **17 min 51 s** | **9 min 4 s** | **6 min 16 s** | **6 min 42 s** |
 
 At home, downloading takes over half the time. On AWS it is much faster, but with four
 vCPUs parsing the flight CSVs is slower, as the loader shares them with ClickHouse
@@ -115,10 +115,11 @@ again to an m7i.4xlarge (16 vCPUs) barely helps: everything but the downloads to
 against 225 s on 8 vCPUs, all of it saved in `load-flights`, so 8 vCPUs is the better buy. Either way, the result is 197 million rows: 41 GB
 of data, stored in 10 GB, and the tables are identical.
 
-These times are from before the `by_tail` projection on `faa.ontime` (see
-[Query performance](#query-performance)). At home, the projection takes `load-flights`
-from 87 s to 141 s, and `ontime` from 4.4 GiB to 9.4 GiB on disk, as it stores every
-flight a second time.
+The last column adds the `by_tail` projection on `faa.ontime` (see
+[Query performance](#query-performance)), which stores every flight a second time. It
+takes `ontime` from 4.4 GiB to 9.4 GiB on disk. On AWS with 8 vCPUs it adds 13 s to
+`load-flights`, and the tables are otherwise identical. At home the cost is bigger:
+`load-flights` went from 87 s to 141 s.
 
 To time a load from scratch, drop the `faa` database and move the downloaded files out of
 `data/raw/`, then run:
@@ -160,6 +161,10 @@ with the same seed, so the queries were identical.
 | 1 to 12 months | 228 | 281 ms / 6.8 s | 85 ms / 586 ms |
 | 1 to 10 years | 2,629 | 3.2 s / 19.4 s | 354 ms / 2.2 s |
 | **Queries a second** | | **5.7** | **41.4** |
+
+The same test on the AWS m7i.2xlarge with the projection, run on the server itself, managed
+91.9 queries a second: p50 / p99 of 12 ms / 44 ms for up to a week, and 169 ms / 869 ms
+for 1 to 10 years.
 
 - **Ordered by date.** `faa.ontime` is ordered by date, not by aircraft. To find one
   aircraft's flights, every flight in the range is read and `tail` is computed for each,
