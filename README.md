@@ -8,7 +8,7 @@ A ClickHouse / Grafana application that uses publicly available FAA flight and w
 Developed with ClickHouse 26.9 and Grafana 13. The ten years of data from 2016 take about
 5 GB of downloads and about 10 GB in ClickHouse.
 
-![Flight Delays dashboard, 2025](docs/screenshots/flight-delays.jpg)
+![Flight Delays dashboard, February to July 2026](docs/screenshots/flight-delays.jpg)
 
 ## Data
 
@@ -263,29 +263,30 @@ in the time range.
 
 ### Screenshots
 
-**Flight Delays**, 2025: headline figures, delays and cancellations by day, delay causes by
-month and the airline table (top, above); further down, the airport map, the most delayed
-airports and the least reliable city pairs and flight numbers:
+**Flight Delays**, February to July 2026: headline figures, delays and cancellations by
+day, delay causes by month and the airline table (top, above); further down, the airport
+map, the most delayed airports and the least reliable city pairs and flight numbers:
 
 ![Flight Delays: airport map and top-10 rankings](docs/screenshots/flight-delays-rankings.jpg)
 
-**Weather Impact**, 2025: how late departures, cancellations and delays vary with the weather
-at the departure airport:
+**Weather Impact**, February to July 2026: how late departures, cancellations and delays
+vary with the weather at the departure airport:
 
 ![Weather Impact dashboard](docs/screenshots/weather-impact.jpg)
 
-**Airport Weather**, Chicago O'Hare, 4-11 January 2025: airports coloured by flight
-category, the latest report, and the flight category over time:
+**Airport Weather**, Chicago O'Hare, February to July 2026: airports coloured by flight
+category at their latest report, that report decoded, and the flight category over time:
 
 ![Airport Weather dashboard](docs/screenshots/airport-weather.jpg)
 
-Its cloud layers, coloured by cover, over the full height and below 5,000 ft, where the
-overcast of 6 January drops into IFR:
+Its cloud layers over the six months, coloured by cover, over the full height and below
+5,000 ft, where the shaded bands show the flight category a ceiling at that height gives:
+MVFR up to 3,000 ft, IFR below 1,000 ft and LIFR below 500 ft:
 
 ![Airport Weather: cloud layers and low cloud](docs/screenshots/airport-weather-clouds.jpg)
 
-**Aircraft Reliability**, 2025: the fleet overview, the least reliable aircraft, and one
-aircraft's history (N511AE, an Envoy CRJ-700):
+**Aircraft Reliability**, February to July 2026: the fleet overview, the least reliable
+aircraft (all ten flown by Spirit), and one aircraft's history (N511AE, a PSA Airlines CRJ-700):
 
 ![Aircraft Reliability dashboard](docs/screenshots/aircraft-reliability.jpg)
 ![Aircraft Reliability: least reliable aircraft](docs/screenshots/aircraft-rankings.jpg)
