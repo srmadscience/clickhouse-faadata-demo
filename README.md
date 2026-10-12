@@ -79,6 +79,32 @@ weather, the station list or the registry up to date, use `--refresh`:
     scripts/fetch-stations.sh --refresh
     scripts/fetch-registry.sh --refresh
 
+### Hardware and load times
+
+A full load of January 2016 to July 2026 from an empty server, timed in October 2026:
+
+* **ClickHouse server**: Intel Core i5-6500 (4 cores, 4 threads, 3.2 GHz, 3.6 GHz turbo,
+  6 MB L3), 48 GB RAM, SSD; ClickHouse 26.9
+* **Loader**: the scripts and Java loader on an Apple M2 Mac (16 GB RAM, Java 21), on the
+  same local network as the server
+* **Downloads**: from the [data mirror](#data-mirror) over the internet
+
+| Step | Time |
+|------|-----:|
+| `create-database.sh` | 0 s |
+| `fetch-flights.sh 2016-01 2026-07` (127 months, 3.3 GB) | 14 min 14 s |
+| `load-flights.sh` (68.4 million flights) | 10 min 28 s |
+| `build-tail-day.sh` | 22 s |
+| `fetch-stations.sh` / `load-stations.sh` | 3 s |
+| `fetch-weather.sh 2016 2026` (11 years, 1.6 GB) | 3 min 35 s |
+| `load-weather.sh` (42.2 million reports) | 2 min 44 s |
+| `build-flight-weather.sh` | 2 min 41 s |
+| `fetch-registry.sh` / `load-registry.sh` | 18 s |
+| **Total** | **34 min 25 s** |
+
+Downloading takes over half the time and depends on the connection. The result is 197
+million rows: 41 GB of data, stored in 10 GB.
+
 ## Data mirror
 
 The original sources are slow (IEM weather alone takes about 10 hours at one request at a
