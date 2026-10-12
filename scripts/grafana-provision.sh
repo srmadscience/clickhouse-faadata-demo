@@ -16,6 +16,7 @@
 # Configures a Grafana server over SSH: a Linux package install (/etc/grafana,
 # /var/lib/grafana, systemd service grafana-server) with the
 # grafana-clickhouse-datasource plugin, reached with key login and passwordless sudo.
+# grafana.ssh=local configures a Grafana on this machine instead, without SSH.
 #   - installs the ClickHouse datasource and dashboard provider from grafana/provisioning/
 #   - copies grafana/dashboards/*.json to the dashboard folder Grafana watches
 #   - gives grafana-server the ClickHouse credentials via a root-only env file
@@ -27,26 +28,33 @@
 #
 #   scripts/grafana-provision.sh
 #   GRAFANA_SSH=me@grafana-host scripts/grafana-provision.sh
+#   GRAFANA_SSH=local scripts/grafana-provision.sh
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 
 GRAFANA_SSH="${GRAFANA_SSH:-$(prop grafana.ssh)}"
 [[ -n "$GRAFANA_SSH" ]] || { echo "error: set grafana.ssh=user@host in clickhouse.properties, or GRAFANA_SSH" >&2; exit 1; }
 GRAFANA_URL="${GRAFANA_URL:-$(prop grafana.url)}"
-GRAFANA_URL="${GRAFANA_URL:-http://${GRAFANA_SSH#*@}:3000}"
+GRAFANA_HOST=${GRAFANA_SSH#*@}; [[ "$GRAFANA_SSH" != local ]] || GRAFANA_HOST=localhost
+GRAFANA_URL="${GRAFANA_URL:-http://$GRAFANA_HOST:3000}"
 GRAFANA_PORT=$(sed -E 's#^[a-z]+://[^/:]+:?([0-9]*).*#\1#' <<< "$GRAFANA_URL"); GRAFANA_PORT="${GRAFANA_PORT:-3000}"
 # ClickHouse as Grafana reaches it (native protocol), by default the host in clickhouse.url.
 GF_CH_HOST="${GRAFANA_CLICKHOUSE_HOST:-$(prop grafana.clickhouse.host)}"
 GF_CH_HOST="${GF_CH_HOST:-$(sed -E 's#^[a-z]+://([^/:]+).*#\1#' <<< "$CH_URL")}"
 GF_CH_PORT="${GRAFANA_CLICKHOUSE_PORT:-$(prop grafana.clickhouse.port)}"; GF_CH_PORT="${GF_CH_PORT:-9000}"
-if [[ "$GF_CH_HOST" =~ ^(localhost|127\.0\.0\.1|::1)$ && ! "${GRAFANA_SSH#*@}" =~ ^(localhost|127\.0\.0\.1|::1)$ ]]; then
+if [[ "$GF_CH_HOST" =~ ^(localhost|127\.0\.0\.1|::1)$ && ! "$GRAFANA_HOST" =~ ^(localhost|127\.0\.0\.1|::1)$ ]]; then
   echo "warn: Grafana will look for ClickHouse at $GF_CH_HOST, i.e. on the Grafana server itself;" >&2
   echo "      set grafana.clickhouse.host if ClickHouse runs elsewhere" >&2
 fi
 
 PROV="$PROJECT_DIR/grafana/provisioning"
 
-remote() { ssh -o BatchMode=yes "$GRAFANA_SSH" "$@"; }
+# remote COMMAND...: runs a shell command on the Grafana server, as ssh would.
+if [[ "$GRAFANA_SSH" == local ]]; then
+  remote() { bash -c "$*"; }
+else
+  remote() { ssh -o BatchMode=yes "$GRAFANA_SSH" "$@"; }
+fi
 
 echo "Installing provisioning files on $GRAFANA_SSH (ClickHouse at $GF_CH_HOST:$GF_CH_PORT)"
 sed -e "s/__CLICKHOUSE_HOST__/$GF_CH_HOST/" -e "s/__CLICKHOUSE_PORT__/$GF_CH_PORT/" "$PROV/datasources/clickhouse.yaml" \

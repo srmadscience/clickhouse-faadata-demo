@@ -9,7 +9,8 @@ clickhouse.database=faa
 
 # Grafana, for scripts/grafana-provision.sh only (environment variables
 # GRAFANA_SSH / GRAFANA_URL / GRAFANA_CLICKHOUSE_HOST / _PORT override these).
-# SSH login on the Grafana server: key-based, with passwordless sudo.
+# SSH login on the Grafana server: key-based, with passwordless sudo; or
+# "local" for a Grafana on this machine (run as a user with sudo).
 #grafana.ssh=user@grafana-host
 # Grafana's web address, for the dashboard links printed at the end.
 # Default: http://<host from grafana.ssh>:3000

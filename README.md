@@ -38,6 +38,7 @@ are never loaded, and owner names only for organisations, not individuals.
     src/main/java/...      Loader: ping | schema | load (streams CSV / .gz / .zip)
     sql/                   Table definitions, run in file-name order
     scripts/               Everything needed to rebuild the database and Grafana (below)
+    aws/                   CloudFormation template for a complete demo server (below)
     grafana/provisioning/  Datasource + dashboard provider config
     grafana/dashboards/    Exported dashboard JSON (committed)
     data/                  Downloaded data: NOT in git (see data/README.md)
@@ -211,6 +212,31 @@ aircraft's history (N511AE, an Envoy CRJ-700):
 
 To add a dashboard: build it in Grafana, export it as JSON (Share > Export), save it in
 `grafana/dashboards/`, commit, and re-run the script.
+
+## Running on AWS
+
+[`aws/faa-demo.yaml`](aws/faa-demo.yaml) is a CloudFormation template that builds the
+whole demo on one EC2 instance (Ubuntu 24.04, m7i.xlarge by default) in a new VPC, with
+only ports 22 (SSH) and 3000 (Grafana) open:
+
+* ClickHouse, with its built-in Prometheus endpoint switched on
+* Prometheus, scraping ClickHouse and node_exporter
+* Grafana, with the FAA dashboards, [Node Exporter Full](https://grafana.com/grafana/dashboards/1860)
+  and [Clickhouse internal exporter](https://grafana.com/grafana/dashboards/13500)
+* this repository, with the flights and weather from `LoadFrom` to `LoadTo` loaded
+
+    aws cloudformation create-stack --stack-name faa-demo \
+      --template-body file://aws/faa-demo.yaml \
+      --parameters ParameterKey=KeyName,ParameterValue=my-key \
+                   ParameterKey=AllowedCidr,ParameterValue=$(curl -s https://checkip.amazonaws.com)/32
+    aws cloudformation describe-stacks --stack-name faa-demo --query 'Stacks[0].Outputs'
+
+Grafana's user is `admin`, with the password in the `GrafanaPassword` parameter (default
+`hiredavid`). `AllowedCidr` defaults to anywhere, so set it to your own address. The
+instance clones the repository and runs [`scripts/install-server.sh`](scripts/install-server.sh),
+which works on any fresh Ubuntu 24.04 machine; follow its progress, about 30 minutes
+with the load, in `/var/log/faa-setup.log`. ClickHouse, Prometheus and node_exporter
+listen only on localhost. Delete the stack to remove everything.
 
 ## Large data files
 
