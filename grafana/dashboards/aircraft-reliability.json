@@ -1795,6 +1795,100 @@
         "cellHeight": "sm"
       },
       "id": 23
+    },
+    {
+      "type": "table",
+      "title": "Flight history",
+      "description": "Every flight this aircraft was scheduled for in the time range, newest first, up to 5,000. Times are local to the airport (HHMM); delays are in minutes. Cancellation codes: A carrier, B weather, C air traffic system, D security.",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-faa"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 78,
+        "w": 24,
+        "h": 14
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-faa"
+          },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT toString(FlightDate) AS Date, Reporting_Airline AS Airline, Flight_Number_Reporting_Airline AS Flight,\n       concat(Origin, ' → ', Dest) AS Route,\n       lpad(toString(CRSDepTime), 4, '0') AS `Sched dep`, lpad(toString(DepTime), 4, '0') AS Dep,\n       DepDelay AS `Dep delay`,\n       lpad(toString(CRSArrTime), 4, '0') AS `Sched arr`, lpad(toString(ArrTime), 4, '0') AS Arr,\n       ArrDelay AS `Arr delay`,\n       multiIf(Cancelled = 1, concat('Cancelled (', CancellationCode, ')'),\n               Diverted = 1, 'Diverted', ArrDelay >= 15, 'Late', 'On time') AS Outcome,\n       Distance AS Miles\nFROM faa.ontime WHERE $__dateFilter(FlightDate) AND tail = '${tail}'\nORDER BY FlightDate DESC, CRSDepTime DESC\nLIMIT 5000\n-- ontime is sorted by date: reading it in order would skip the by_tail projection\nSETTINGS optimize_read_in_order = 0"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Dep delay"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-GrYlRd"
+                }
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 120
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Arr delay"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "continuous-GrYlRd"
+                }
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 120
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "id": 25
     }
   ],
   "schemaVersion": 41,
