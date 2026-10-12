@@ -8,6 +8,8 @@ A ClickHouse / Grafana application that uses publicly available FAA flight and w
 Developed with ClickHouse 26.9 and Grafana 13. The ten years of data from 2016 take about
 5 GB of downloads and about 10 GB in ClickHouse.
 
+![Flight Delays dashboard, 2025](docs/screenshots/flight-delays.jpg)
+
 ## Data
 
 | Table | Source | Grain |
@@ -142,6 +144,36 @@ The top-10 charts rank by carrier cancellations (cancellation code A) per 1,000 
 so weather and air-traffic cancellations don't count against an airline, and only consider
 aircraft, city pairs or flight numbers with at least "Min flights flown" completed flights
 in the time range.
+
+### Screenshots
+
+**Flight Delays**, 2025: headline figures, delays and cancellations by day, delay causes by
+month and the airline table (top, above); further down, the airport map, the most delayed
+airports and the least reliable city pairs and flight numbers:
+
+![Flight Delays: airport map and top-10 rankings](docs/screenshots/flight-delays-rankings.jpg)
+
+**Weather Impact**, 2025: how late departures, cancellations and delays vary with the weather
+at the departure airport:
+
+![Weather Impact dashboard](docs/screenshots/weather-impact.jpg)
+
+**Airport Weather**, Chicago O'Hare, 4-11 January 2025: airports coloured by flight
+category, the latest report, and the flight category over time:
+
+![Airport Weather dashboard](docs/screenshots/airport-weather.jpg)
+
+Its cloud layers, coloured by cover, over the full height and below 5,000 ft, where the
+overcast of 6 January drops into IFR:
+
+![Airport Weather: cloud layers and low cloud](docs/screenshots/airport-weather-clouds.jpg)
+
+**Aircraft Reliability**, 2025: the fleet overview, the least reliable aircraft, and one
+aircraft's history (N511AE, an Envoy CRJ-700):
+
+![Aircraft Reliability dashboard](docs/screenshots/aircraft-reliability.jpg)
+![Aircraft Reliability: least reliable aircraft](docs/screenshots/aircraft-rankings.jpg)
+![Aircraft Reliability: one aircraft](docs/screenshots/aircraft-detail.jpg)
 
 To add a dashboard: build it in Grafana, export it as JSON (Share > Export), save it in
 `grafana/dashboards/`, commit, and re-run the script.
