@@ -50,6 +50,7 @@ for name in "${missing[@]}"; do
     echo "fetch  $name  (mirror)"
   else
     [[ "$name" =~ ^ontime_([0-9]{4})_([0-9]{2})\.zip$ ]]
+    [[ -z "$MIRROR" ]] || echo "warn: $name not fetched from the mirror; trying BTS, which is much slower" >&2
     if download "${BASE_URL}_${BASH_REMATCH[1]}_$((10#${BASH_REMATCH[2]})).zip" "$target"; then
       echo "fetch  $name  (BTS)"
     else

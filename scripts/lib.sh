@@ -104,8 +104,12 @@ mirror_fetch() {
 # mirror has, as listed by mirror_assets, into DIR, FETCH_JOBS (default 4) at a
 # time: one download from GitHub runs at about 3 MB/s, four together at about
 # 11. Checks each file's SHA-256 and prints the names of those it fetched.
+# GitHub sometimes answers a burst of downloads with 504s that outlast curl's
+# retries, so files the parallel pass misses are tried again one at a time;
+# any still missing are named in a warning, and the caller falls back to the
+# original source.
 mirror_fetch_many() {
-  local listing="$1" dir="$2" name sum url args=()
+  local listing="$1" dir="$2" name sum url args=() missed=()
   shift 2
   for name in "$@"; do
     url=$(awk -F'\t' -v n="$name" '$1 == n { print $3 }' <<< "$listing")
@@ -113,18 +117,25 @@ mirror_fetch_many() {
   done
   [[ ${#args[@]} -gt 0 ]] || return 0
   mkdir -p "$dir"
-  # Failed downloads are not fatal here: they fail the checksum below, and the
-  # caller then tries the original source.
   curl -fsSL -Z --parallel-max "${FETCH_JOBS:-4}" --retry 5 --retry-delay 10 -C - "${args[@]}" || true
   for name in "$@"; do
-    [[ -f "$dir/$name.part" ]] || continue
     sum=$(awk -F'\t' -v n="$name" '$1 == n { print $2 }' <<< "$listing")
-    if [[ "$(shasum -a 256 "$dir/$name.part" | cut -d' ' -f1)" == "$sum" ]]; then
+    [[ -n "$sum" ]] || continue
+    if [[ -f "$dir/$name.part" && "$(shasum -a 256 "$dir/$name.part" | cut -d' ' -f1)" == "$sum" ]]; then
       mv "$dir/$name.part" "$dir/$name"
       echo "$name"
     else
-      echo "warn: $name from the mirror is incomplete or does not match its checksum; deleted" >&2
       rm -f "$dir/$name.part"
+      missed+=("$name")
+    fi
+  done
+  [[ ${#missed[@]} -gt 0 ]] || return 0
+  echo "warn: ${#missed[@]} file(s) failed to download from the mirror; retrying one at a time" >&2
+  for name in "${missed[@]}"; do
+    if mirror_fetch "$listing" "$name" "$dir/$name"; then
+      echo "$name"
+    else
+      echo "warn: could not download $name from the mirror" >&2
     fi
   done
 }
