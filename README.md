@@ -115,6 +115,11 @@ again to an m7i.4xlarge (16 vCPUs) barely helps: everything but the downloads to
 against 225 s on 8 vCPUs, all of it saved in `load-flights`, so 8 vCPUs is the better buy. Either way, the result is 197 million rows: 41 GB
 of data, stored in 10 GB, and the tables are identical.
 
+These times are from before the `by_tail` projection on `faa.ontime` (see
+[Query performance](#query-performance)). At home, the projection takes `load-flights`
+from 87 s to 141 s, and `ontime` from 4.4 GiB to 9.4 GiB on disk, as it stores every
+flight a second time.
+
 To time a load from scratch, drop the `faa` database and move the downloaded files out of
 `data/raw/`, then run:
 
@@ -145,19 +150,30 @@ one line per query, and `--seed N` repeats an earlier run's queries. Add `--time
 "what changed"` before the workload to append a summary to
 [`testresults_query.csv`](testresults_query.csv), as `reproduce.sh` does for loads.
 
-The first test ran 8 threads back to back, from the M2 against xraytunnel, and managed
-5.7 queries a second:
+Each test ran 8 threads back to back for 60 seconds, from the M2 against xraytunnel,
+with the same seed, so the queries were identical.
 
-| Range | p50 | p90 | p99 | Flights returned |
-| --- | ---: | ---: | ---: | ---: |
-| 1 to 7 days | 54 ms | 128 ms | 278 ms | 6 |
-| 8 to 31 days | 124 ms | 254 ms | 358 ms | 28 |
-| 1 to 12 months | 281 ms | 1.5 s | 6.8 s | 228 |
-| 1 to 10 years | 3.2 s | 9.8 s | 19.4 s | 2,629 |
+| Range | Flights returned | Ordered by date: p50 / p99 | `by_tail` projection: p50 / p99 |
+| --- | ---: | ---: | ---: |
+| 1 to 7 days | 6 | 54 ms / 278 ms | 39 ms / 184 ms |
+| 8 to 31 days | 28 | 124 ms / 358 ms | 44 ms / 225 ms |
+| 1 to 12 months | 228 | 281 ms / 6.8 s | 85 ms / 586 ms |
+| 1 to 10 years | 2,629 | 3.2 s / 19.4 s | 354 ms / 2.2 s |
+| **Queries a second** | | **5.7** | **41.4** |
 
-The cost grows with the length of the range because `faa.ontime` is ordered by date, not
-by aircraft. Every flight in the range is read to find one aircraft's flights, and `tail`
-is computed for each of them.
+- **Ordered by date.** `faa.ontime` is ordered by date, not by aircraft. To find one
+  aircraft's flights, every flight in the range is read and `tail` is computed for each,
+  so the cost grows with the length of the range.
+- **With the projection.**
+  [`sql/16_ontime_by_tail.sql`](sql/16_ontime_by_tail.sql) adds `by_tail`, a second copy
+  of the table ordered by aircraft and then date, so only that aircraft's rows are read.
+  It costs load time and disk space (see [Hardware and load times](#hardware-and-load-times)).
+- **The `ORDER BY` catch.** A query that sorts by `FlightDate` doesn't use the projection
+  on its own. Because the table is already in date order, ClickHouse reads it in that
+  order and rejects the projection, which made the first test with it slower (3.6 queries
+  a second). Queries filtering on `tail` therefore add `SETTINGS optimize_read_in_order =
+  0`, as the benchmark and the Aircraft Reliability dashboard do. To check a query, run
+  `EXPLAIN` on it and look for `ReadFromMergeTree (by_tail)`.
 
 ## Data mirror
 

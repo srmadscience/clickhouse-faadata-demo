@@ -1754,7 +1754,7 @@
           "editorType": "sql",
           "queryType": "table",
           "format": 1,
-          "rawSql": "SELECT toString(FlightDate) AS Date, Reporting_Airline AS Airline, Flight_Number_Reporting_Airline AS Flight,\n       concat(Origin, ' → ', Dest) AS Route,\n       lpad(toString(CRSDepTime), 4, '0') AS `Sched dep`,\n       multiIf(Cancelled = 1, concat('Cancelled (', CancellationCode, ')'),\n               Diverted = 1, 'Diverted', 'Delayed') AS Outcome,\n       DepDelay AS `Dep delay`, CarrierDelay AS `Carrier delay`, LateAircraftDelay AS `Late aircraft delay`\nFROM faa.ontime WHERE $__dateFilter(FlightDate) AND tail = '${tail}'\n  AND (Cancelled = 1 OR Diverted = 1 OR CarrierDelay >= 15)\nORDER BY FlightDate DESC, CRSDepTime DESC\nLIMIT 500"
+          "rawSql": "SELECT toString(FlightDate) AS Date, Reporting_Airline AS Airline, Flight_Number_Reporting_Airline AS Flight,\n       concat(Origin, ' → ', Dest) AS Route,\n       lpad(toString(CRSDepTime), 4, '0') AS `Sched dep`,\n       multiIf(Cancelled = 1, concat('Cancelled (', CancellationCode, ')'),\n               Diverted = 1, 'Diverted', 'Delayed') AS Outcome,\n       DepDelay AS `Dep delay`, CarrierDelay AS `Carrier delay`, LateAircraftDelay AS `Late aircraft delay`\nFROM faa.ontime WHERE $__dateFilter(FlightDate) AND tail = '${tail}'\n  AND (Cancelled = 1 OR Diverted = 1 OR CarrierDelay >= 15)\nORDER BY FlightDate DESC, CRSDepTime DESC\nLIMIT 500\n-- ontime is sorted by date: reading it in order would skip the by_tail projection\nSETTINGS optimize_read_in_order = 0"
         }
       ],
       "fieldConfig": {

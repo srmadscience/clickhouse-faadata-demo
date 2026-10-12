@@ -79,6 +79,11 @@ public final class QueryBench {
      * flights, between two random dates from 1 day to 10 years apart. Range
      * lengths are spread evenly on a log scale, so days, weeks, months and
      * years are equally likely.
+     * <p>
+     * optimize_read_in_order is off because ontime is itself sorted by date:
+     * with it on, ORDER BY FlightDate makes ClickHouse read the table in order
+     * and pass over the by_tail projection (see sql/16_ontime_by_tail.sql),
+     * scanning every flight in the range instead of one aircraft's.
      */
     static final class FlightHistory implements Workload {
         static final int MAX_DAYS = 3653;
@@ -88,7 +93,8 @@ public final class QueryBench {
                        Cancelled, CancellationCode, Diverted, Distance
                 FROM faa.ontime
                 WHERE tail = {tail:String} AND FlightDate BETWEEN {from:Date} AND {to:Date}
-                ORDER BY FlightDate, CRSDepTime""";
+                ORDER BY FlightDate, CRSDepTime
+                SETTINGS optimize_read_in_order = 0""";
 
         private final List<String> tails;
         private final LocalDate first;
