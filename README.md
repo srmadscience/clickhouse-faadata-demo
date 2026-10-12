@@ -168,7 +168,11 @@ for 1 to 10 years.
 
 At a steady 20 queries a second, about half what xraytunnel manages flat out, it keeps up
 easily: 13 ms / 28 ms for up to a week, 117 ms / 631 ms for 1 to 10 years, and a p99 of
-489 ms overall, against 1.4 s when it is saturated.
+489 ms overall, against 1.4 s when it is saturated. The AWS m7i.2xlarge, running the test on
+the server itself, does the same with less latency: 8 ms / 17 ms for up to a week, 90 ms /
+645 ms for 1 to 10 years, and a p99 of 460 ms overall. Short ranges gain most from
+having no network in the way; the long ranges, which return thousands of rows, barely
+improve.
 
     scripts/bench-queries.sh flight-history --rate 20 --threads 32 --duration 60
 
