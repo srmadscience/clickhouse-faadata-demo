@@ -127,7 +127,11 @@ if [[ ! -f /etc/apt/sources.list.d/grafana.list ]]; then
   apt-get update -q
 fi
 apt-get install -y -q grafana
+# Grafana 13 no longer bundles the Prometheus datasource, and grafana cli runs
+# as root here, so the plugins it installs must be handed to the grafana user.
 grafana cli plugins install grafana-clickhouse-datasource
+grafana cli plugins install prometheus
+chown -R grafana:grafana /var/lib/grafana/plugins
 cat > /etc/grafana/provisioning/datasources/prometheus.yaml <<'EOF'
 apiVersion: 1
 datasources:

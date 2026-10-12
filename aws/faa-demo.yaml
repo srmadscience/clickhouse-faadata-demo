@@ -16,7 +16,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: >-
   clickhouse-faadata-demo on one EC2 instance: ClickHouse, Prometheus, node_exporter
   and Grafana, with FAA flight and weather data loaded. Ports 22 (SSH) and 3000
-  (Grafana) are open. Setup and loading take about 30 minutes after the stack is
+  (Grafana) are open. Setup and loading take about 15 minutes after the stack is
   created; follow them in /var/log/faa-setup.log.
 
 Parameters:
