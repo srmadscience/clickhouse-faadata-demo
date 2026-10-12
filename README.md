@@ -174,6 +174,11 @@ the server itself, does the same with less latency: 8 ms / 17 ms for up to a wee
 having no network in the way; the long ranges, which return thousands of rows, barely
 improve.
 
+At 40 queries a second, just under what xraytunnel manages flat out, it still completes
+every query on schedule on average, but there is no headroom. The p50 holds at 30 ms
+overall, while the p99 jumps to 4.1 s; even queries for up to a week see 2.6 s. When a
+few long ranges arrive together, they probably hold up the queries behind them.
+
     scripts/bench-queries.sh flight-history --rate 20 --threads 32 --duration 60
 
 - **Ordered by date.** `faa.ontime` is ordered by date, not by aircraft. To find one
