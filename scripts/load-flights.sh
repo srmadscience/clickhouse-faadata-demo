@@ -32,8 +32,10 @@ for f in "${files[@]}"; do
   [[ "$(basename "$f")" =~ ^ontime_([0-9]{4})_([0-9]{2})\.zip$ ]] \
     || { echo "error: unexpected file name $f" >&2; exit 1; }
   ch_query "ALTER TABLE faa.ontime DROP PARTITION ${BASH_REMATCH[1]}${BASH_REMATCH[2]}"
-  # BTS lines end with a stray ',' (an unnamed extra column), hence skip_unknown_fields.
-  java -jar "$LOADER_JAR" load faa.ontime --set input_format_skip_unknown_fields=1 "$f"
 done
+# --binary parses the CSV here and sends ClickHouse ready-made columns, which
+# costs the server about a tenth of the CPU of parsing CSV itself; the loader
+# then becomes the bottleneck, so it loads LOAD_JOBS (default 8) files at a time.
+java -jar "$LOADER_JAR" load faa.ontime --binary --jobs "${LOAD_JOBS:-8}" "${files[@]}"
 
 ch_query "SELECT toYYYYMM(FlightDate) AS month, count() AS flights FROM faa.ontime GROUP BY month ORDER BY month FORMAT PrettyCompact"

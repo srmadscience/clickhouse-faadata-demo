@@ -21,20 +21,30 @@ import java.io.ByteArrayOutputStream;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.SequenceInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
+import java.util.zip.Deflater;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import com.clickhouse.client.api.Client;
+import com.clickhouse.client.api.DataStreamWriter;
 import com.clickhouse.client.api.insert.InsertResponse;
 import com.clickhouse.client.api.insert.InsertSettings;
 import com.clickhouse.data.ClickHouseFormat;
@@ -45,7 +55,7 @@ import com.clickhouse.data.ClickHouseFormat;
  * <pre>
  *   ping                          check connectivity and print the server version
  *   schema &lt;file.sql&gt;...          run ';'-separated DDL statements
- *   load &lt;table&gt; [--set k=v]... [--combine] &lt;path&gt;...
+ *   load &lt;table&gt; [--set k=v]... [--combine | --binary] [--jobs N] &lt;path&gt;...
  *                                 stream CSV files (plain, .gz or .zip) into a table,
  *                                 applying ClickHouse settings to each insert
  * </pre>
@@ -54,6 +64,10 @@ import com.clickhouse.data.ClickHouseFormat;
  * independent of file size. Each file is one insert, unless --combine is given:
  * then all the plain or .gz files under each path go in one insert, which is much
  * faster for many small files. Their header lines must be identical.
+ * <p>
+ * --binary parses the CSV here and sends it gzipped in ClickHouse's Native
+ * format (see {@link CsvNative}), which leaves the server far less to do.
+ * --jobs N loads N files at a time.
  */
 public class Loader {
 
@@ -85,7 +99,7 @@ public class Loader {
     }
 
     private static void usage() {
-        System.err.println("usage: Loader ping | schema <file.sql>... | load <table> [--set k=v]... [--combine] <file-or-dir>...");
+        System.err.println("usage: Loader ping | schema <file.sql>... | load <table> [--set k=v]... [--combine | --binary] [--jobs N] <file-or-dir>...");
     }
 
     private static void ping(Client client, ClickHouseConfig config) throws Exception {
@@ -114,9 +128,15 @@ public class Loader {
         InsertSettings settings = new InsertSettings();
         List<String> paths = new ArrayList<>();
         boolean combine = false;
+        boolean binary = false;
+        int jobs = 1;
         for (int i = 0; i < args.size(); i++) {
             if (args.get(i).equals("--combine")) {
                 combine = true;
+            } else if (args.get(i).equals("--binary")) {
+                binary = true;
+            } else if (args.get(i).equals("--jobs") && i + 1 < args.size()) {
+                jobs = Integer.parseInt(args.get(++i));
             } else if (args.get(i).equals("--set") && i + 1 < args.size()) {
                 String[] kv = args.get(++i).split("=", 2);
                 if (kv.length != 2) {
@@ -127,6 +147,10 @@ public class Loader {
                 paths.add(args.get(i));
             }
         }
+        if (combine && binary) {
+            throw new IllegalArgumentException("--combine and --binary can't be used together");
+        }
+        Map<String, String> types = binary ? insertableColumns(client, table) : null;
         long totalRows = 0;
         if (combine) {
             for (String path : paths) {
@@ -140,17 +164,49 @@ public class Loader {
             System.out.printf("Total: %,d rows%n", totalRows);
             return;
         }
-        for (Path file : expand(paths)) {
-            long start = System.nanoTime();
-            long rows = loadFile(client, table, file, settings);
-            totalRows += rows;
-            System.out.printf("%s -> %s: %,d rows in %.1fs%n",
-                    file, table, rows, (System.nanoTime() - start) / 1e9);
+        ExecutorService pool = Executors.newFixedThreadPool(jobs);
+        try {
+            List<Future<Long>> results = new ArrayList<>();
+            for (Path file : expand(paths)) {
+                results.add(pool.submit(() -> {
+                    long start = System.nanoTime();
+                    long rows = loadFile(client, table, file, settings, types);
+                    System.out.printf("%s -> %s: %,d rows in %.1fs%n",
+                            file, table, rows, (System.nanoTime() - start) / 1e9);
+                    return rows;
+                }));
+            }
+            for (Future<Long> result : results) {
+                try {
+                    totalRows += result.get();
+                } catch (ExecutionException e) {
+                    throw e.getCause() instanceof Exception cause ? cause : e;
+                }
+            }
+        } finally {
+            pool.shutdownNow();
         }
         System.out.printf("Total: %,d rows%n", totalRows);
     }
 
-    private static long loadFile(Client client, String table, Path file, InsertSettings settings) throws Exception {
+    /** The columns of {@code table} an insert can set (not ALIAS or MATERIALIZED): name to type. */
+    private static Map<String, String> insertableColumns(Client client, String table) throws Exception {
+        String[] dbTable = table.contains(".") ? table.split("\\.", 2) : new String[] {client.getDefaultDatabase(), table};
+        Map<String, String> types = new LinkedHashMap<>();
+        for (var r : client.queryAll("SELECT name, type FROM system.columns WHERE database = '"
+                + dbTable[0].replace("'", "\\'") + "' AND table = '" + dbTable[1].replace("'", "\\'")
+                + "' AND default_kind IN ('', 'DEFAULT') ORDER BY position")) {
+            types.put(r.getString(1), r.getString(2));
+        }
+        if (types.isEmpty()) {
+            throw new IllegalArgumentException("table " + table + " not found");
+        }
+        return types;
+    }
+
+    /** Loads one file; {@code types} non-null means --binary. */
+    private static long loadFile(Client client, String table, Path file, InsertSettings settings,
+                                 Map<String, String> types) throws Exception {
         String name = file.getFileName().toString().toLowerCase();
         try (InputStream raw = Files.newInputStream(file)) {
             if (name.endsWith(".zip")) {
@@ -160,14 +216,46 @@ public class Loader {
                     ZipEntry entry;
                     while ((entry = zip.getNextEntry()) != null) {
                         if (!entry.isDirectory() && entry.getName().toLowerCase().endsWith(".csv")) {
-                            rows += insert(client, table, new NonClosingInputStream(zip), settings);
+                            rows += types == null
+                                    ? insert(client, table, new NonClosingInputStream(zip), settings)
+                                    : insertBinary(client, table, zip, settings, types);
                         }
                     }
                 }
                 return rows;
             }
             InputStream in = name.endsWith(".gz") ? new GZIPInputStream(raw, 1 << 16) : raw;
-            return insert(client, table, in, settings);
+            return types == null ? insert(client, table, in, settings) : insertBinary(client, table, in, settings, types);
+        }
+    }
+
+    private static long insertBinary(Client client, String table, InputStream in, InsertSettings settings,
+                                     Map<String, String> types) throws Exception {
+        CsvNative.CsvReader csv = new CsvNative.CsvReader(in);
+        CsvNative converter = new CsvNative(CsvNative.readHeader(csv), types);
+        // The client's own request compression is slow (see ClickHouseConfig),
+        // so the data is gzipped here, at the fastest level.
+        InsertSettings gzipped = new InsertSettings(settings.getAllSettings()).appCompressedData(true, "gzip");
+        DataStreamWriter writer = new DataStreamWriter() {
+            @Override
+            public void onOutput(OutputStream out) throws IOException {
+                GZIPOutputStream gz = new GZIPOutputStream(out, 1 << 16) {
+                    {
+                        def.setLevel(Deflater.BEST_SPEED);
+                    }
+                };
+                converter.write(csv, gz);
+                gz.finish();
+            }
+
+            @Override
+            public void onRetry() throws IOException {
+                throw new IOException("insert failed part way through; cannot resend a stream");
+            }
+        };
+        try (InsertResponse response = client.insert(table, writer, ClickHouseFormat.Native, gzipped)
+                .get(TIMEOUT_MINUTES, TimeUnit.MINUTES)) {
+            return response.getWrittenRows();
         }
     }
 
