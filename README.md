@@ -87,23 +87,23 @@ A full load of January 2016 to July 2026 from an empty server, timed in October 
   6 MB L3), 48 GB RAM, SSD; ClickHouse 26.9
 * **Loader**: the scripts and Java loader on an Apple M2 Mac (16 GB RAM, Java 21), on the
   same local network as the server
-* **Downloads**: from the [data mirror](#data-mirror) over the internet
+* **Downloads**: from the [data mirror](#data-mirror) over the internet, four files at a time
 
 | Step | Time |
 |------|-----:|
 | `create-database.sh` | 0 s |
-| `fetch-flights.sh 2016-01 2026-07` (127 months, 3.3 GB) | 14 min 14 s |
-| `load-flights.sh` (68.4 million flights) | 10 min 28 s |
-| `build-tail-day.sh` | 22 s |
-| `fetch-stations.sh` / `load-stations.sh` | 3 s |
-| `fetch-weather.sh 2016 2026` (11 years, 1.6 GB) | 3 min 35 s |
-| `load-weather.sh` (42.2 million reports) | 2 min 44 s |
-| `build-flight-weather.sh` | 2 min 41 s |
+| `fetch-flights.sh 2016-01 2026-07` (127 months, 3.3 GB) | 7 min 34 s |
+| `load-flights.sh` (68.4 million flights) | 11 min 18 s |
+| `build-tail-day.sh` | 24 s |
+| `fetch-stations.sh` / `load-stations.sh` | 5 s |
+| `fetch-weather.sh 2016 2026` (11 years, 1.6 GB) | 2 min 49 s |
+| `load-weather.sh` (42.2 million reports) | 3 min 7 s |
+| `build-flight-weather.sh` | 2 min 50 s |
 | `fetch-registry.sh` / `load-registry.sh` | 18 s |
-| **Total** | **34 min 25 s** |
+| **Total** | **28 min 25 s** |
 
-Downloading takes over half the time and depends on the connection. The result is 197
-million rows: 41 GB of data, stored in 10 GB.
+Downloading takes over a third of the time and depends on the connection. The result is
+197 million rows: 41 GB of data, stored in 10 GB.
 
 To time a load from scratch, drop the `faa` database and move the downloaded files out of
 `data/raw/`, then run:
