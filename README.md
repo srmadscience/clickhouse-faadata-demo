@@ -82,34 +82,35 @@ weather, the station list or the registry up to date, use `--refresh`:
 
 ### Hardware and load times
 
-A full load of January 2016 to July 2026 from an empty server, timed in October 2026 on two
-setups:
+A full load of January 2016 to July 2026 from an empty server, timed in October 2026 on
+three setups:
 
 * **Home**: ClickHouse on an Intel Core i5-6500 (4 cores, 4 threads, 3.2 GHz, 3.6 GHz
   turbo, 6 MB L3) with 48 GB RAM and an SSD; the scripts and Java loader on an Apple M2
   Mac (16 GB RAM) on the same local network; downloads over the internet
-* **AWS**: everything on one m7i.xlarge instance (4 vCPUs, 16 GB RAM, gp3 disk) in
-  us-east-1, built by [`aws/faa-demo.yaml`](#running-on-aws)
+* **AWS**: everything on one instance in us-east-1, built by
+  [`aws/faa-demo.yaml`](#running-on-aws): an m7i.xlarge (4 vCPUs, 16 GB RAM) or an
+  m7i.2xlarge (8 vCPUs, 32 GB RAM), each with a gp3 disk
 
 Both used ClickHouse 26.9 and Java 21. The loader parses the flight CSVs itself, 8 files
 at a time, and downloads come from the [data mirror](#data-mirror), four files at a time.
 
-| Step | Home | AWS |
-|------|-----:|----:|
-| `create-database.sh` | 1 s | 0 s |
-| `fetch-flights.sh 2016-01 2026-07` (127 months, 3.3 GB) | 7 min 11 s | 2 min 28 s |
-| `load-flights.sh` (68.4 million flights) | 1 min 27 s | 3 min 3 s |
-| `build-tail-day.sh` | 21 s | 12 s |
-| `fetch-stations.sh` / `load-stations.sh` | 3 s | 2 s |
-| `fetch-weather.sh 2016 2026` (11 years, 1.6 GB) | 2 min 55 s | 13 s |
-| `load-weather.sh` (42.2 million reports) | 2 min 46 s | 1 min 25 s |
-| `build-flight-weather.sh` | 2 min 43 s | 1 min 35 s |
-| `fetch-registry.sh` / `load-registry.sh` | 24 s | 6 s |
-| **Total** | **17 min 51 s** | **9 min 4 s** |
+| Step | Home | AWS, 4 vCPUs | AWS, 8 vCPUs |
+|------|-----:|-----:|-----:|
+| `create-database.sh` | 1 s | 0 s | 0 s |
+| `fetch-flights.sh 2016-01 2026-07` (127 months, 3.3 GB) | 7 min 11 s | 2 min 28 s | 2 min 16 s |
+| `load-flights.sh` (68.4 million flights) | 1 min 27 s | 3 min 3 s | 1 min 26 s |
+| `build-tail-day.sh` | 21 s | 12 s | 8 s |
+| `fetch-stations.sh` / `load-stations.sh` | 3 s | 2 s | 2 s |
+| `fetch-weather.sh 2016 2026` (11 years, 1.6 GB) | 2 min 55 s | 13 s | 12 s |
+| `load-weather.sh` (42.2 million reports) | 2 min 46 s | 1 min 25 s | 58 s |
+| `build-flight-weather.sh` | 2 min 43 s | 1 min 35 s | 1 min 9 s |
+| `fetch-registry.sh` / `load-registry.sh` | 24 s | 6 s | 5 s |
+| **Total** | **17 min 51 s** | **9 min 4 s** | **6 min 16 s** |
 
-At home, downloading takes over half the time. On AWS it is much faster, but parsing
-the flight CSVs is slower, as the loader shares four vCPUs with ClickHouse instead of
-having the M2's eight cores to itself. Either way, the result is 197 million rows: 41 GB
+At home, downloading takes over half the time. On AWS it is much faster, but with four
+vCPUs parsing the flight CSVs is slower, as the loader shares them with ClickHouse
+instead of having the M2's eight cores to itself; with eight it matches the M2. Either way, the result is 197 million rows: 41 GB
 of data, stored in 10 GB, and the tables are identical.
 
 To time a load from scratch, drop the `faa` database and move the downloaded files out of
@@ -240,8 +241,8 @@ only ports 22 (SSH) and 3000 (Grafana) open:
 Grafana's user is `admin`, with the password in the `GrafanaPassword` parameter (default
 `hiredavid`). `AllowedCidr` defaults to anywhere, so set it to your own address. The
 instance clones the repository and runs [`scripts/install-server.sh`](scripts/install-server.sh),
-which works on any fresh Ubuntu 24.04 machine; follow its progress, about 15 minutes
-with the load, in `/var/log/faa-setup.log`. ClickHouse, Prometheus and node_exporter
+which works on any fresh Ubuntu 24.04 machine; follow its progress, about 10 to 15
+minutes with the load, in `/var/log/faa-setup.log`. ClickHouse, Prometheus and node_exporter
 listen only on localhost. Delete the stack to remove everything.
 
 ## Large data files
