@@ -100,6 +100,35 @@ mirror_fetch() {
   fi
 }
 
+# mirror_fetch_many LISTING DIR NAME...: downloads the files NAME... that the
+# mirror has, as listed by mirror_assets, into DIR, FETCH_JOBS (default 4) at a
+# time: one download from GitHub runs at about 3 MB/s, four together at about
+# 11. Checks each file's SHA-256 and prints the names of those it fetched.
+mirror_fetch_many() {
+  local listing="$1" dir="$2" name sum url args=()
+  shift 2
+  for name in "$@"; do
+    url=$(awk -F'\t' -v n="$name" '$1 == n { print $3 }' <<< "$listing")
+    [[ -z "$url" ]] || args+=(-o "$dir/$name.part" "$url")
+  done
+  [[ ${#args[@]} -gt 0 ]] || return 0
+  mkdir -p "$dir"
+  # Failed downloads are not fatal here: they fail the checksum below, and the
+  # caller then tries the original source.
+  curl -fsSL -Z --parallel-max "${FETCH_JOBS:-4}" --retry 5 --retry-delay 10 -C - "${args[@]}" || true
+  for name in "$@"; do
+    [[ -f "$dir/$name.part" ]] || continue
+    sum=$(awk -F'\t' -v n="$name" '$1 == n { print $2 }' <<< "$listing")
+    if [[ "$(shasum -a 256 "$dir/$name.part" | cut -d' ' -f1)" == "$sum" ]]; then
+      mv "$dir/$name.part" "$dir/$name"
+      echo "$name"
+    else
+      echo "warn: $name from the mirror is incomplete or does not match its checksum; deleted" >&2
+      rm -f "$dir/$name.part"
+    fi
+  done
+}
+
 # month_range 2024-11 2025-02 -> 2024-11 2024-12 2025-01 2025-02
 month_range() {
   local y=$((10#${1%-*})) m=$((10#${1#*-})) ey=$((10#${2%-*})) em=$((10#${2#*-}))

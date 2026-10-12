@@ -30,22 +30,33 @@ BASE_URL="https://transtats.bts.gov/PREZIP/On_Time_Reporting_Carrier_On_Time_Per
 DEST="$PROJECT_DIR/data/raw/flights"
 MIRROR=$(mirror_assets data-flights)
 
+# Months not downloaded yet: first all those on the mirror, several at a time,
+# then any left one by one from BTS.
+missing=()
 for ym in $(month_range "$1" "$2"); do
-  y=${ym%-*}; m=$((10#${ym#*-}))
-  name="ontime_${y}_$(printf %02d "$m").zip"
-  target="$DEST/$name"
-  if [[ -f "$target" ]]; then
+  name="ontime_${ym%-*}_${ym#*-}.zip"
+  if [[ -f "$DEST/$name" ]]; then
     echo "skip   $name"
-    continue
-  fi
-  if mirror_fetch "$MIRROR" "$name" "$target"; then
-    echo "fetch  $name  (mirror)"
-  elif download "${BASE_URL}_${y}_${m}.zip" "$target"; then
-    echo "fetch  $name  (BTS)"
   else
-    rm -f "$target.part"
-    echo "       $name: not available from BTS (yet?)" >&2
-    continue
+    missing+=("$name")
+  fi
+done
+[[ ${#missing[@]} -gt 0 ]] || exit 0
+
+from_mirror=$(mirror_fetch_many "$MIRROR" "$DEST" "${missing[@]}")
+for name in "${missing[@]}"; do
+  target="$DEST/$name"
+  if grep -qxF "$name" <<< "$from_mirror"; then
+    echo "fetch  $name  (mirror)"
+  else
+    [[ "$name" =~ ^ontime_([0-9]{4})_([0-9]{2})\.zip$ ]]
+    if download "${BASE_URL}_${BASH_REMATCH[1]}_$((10#${BASH_REMATCH[2]})).zip" "$target"; then
+      echo "fetch  $name  (BTS)"
+    else
+      rm -f "$target.part"
+      echo "       $name: not available from BTS (yet?)" >&2
+      continue
+    fi
   fi
   unzip -tq "$target" > /dev/null || { echo "error: $target is corrupt; deleted" >&2; rm -f "$target"; exit 1; }
 done

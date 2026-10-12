@@ -42,8 +42,15 @@ IEM="https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py"
 # report_type 3/4 = routine + special METARs. trace=0.0001 keeps p01i numeric.
 PARAMS="data=all&tz=Etc/UTC&format=onlycomma&latlon=yes&elev=yes&missing=empty&trace=0.0001&direct=no&report_type=3&report_type=4"
 
+# Years not downloaded yet come from the mirror first, several at a time.
+tars=()
 for year in $(seq "$from" "$to"); do
-  if [[ ! -d "$DEST/$year" ]] && mirror_fetch "$MIRROR" "weather_$year.tar" "$DEST/weather_$year.tar"; then
+  [[ -d "$DEST/$year" ]] || tars+=("weather_$year.tar")
+done
+[[ ${#tars[@]} -eq 0 ]] || mirror_fetch_many "$MIRROR" "$DEST" "${tars[@]}" > /dev/null
+
+for year in $(seq "$from" "$to"); do
+  if [[ -f "$DEST/weather_$year.tar" ]]; then
     tar -xf "$DEST/weather_$year.tar" -C "$DEST"
     rm "$DEST/weather_$year.tar"
     echo "$year: $(ls "$DEST/$year" | wc -l | tr -d ' ') stations from the mirror"
