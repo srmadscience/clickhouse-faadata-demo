@@ -151,7 +151,7 @@ one line per query, and `--seed N` repeats an earlier run's queries. Add `--time
 "what changed"` before the workload to append a summary to
 [`testresults_query.csv`](testresults_query.csv), as `reproduce.sh` does for loads.
 
-Each test ran 8 threads back to back for 60 seconds, from the M2 against xraytunnel,
+Each test ran 8 threads back to back for 60 seconds, from the M2 against the i5-6500,
 with the same seed, so the queries were identical.
 
 | Range | Flights returned | Ordered by date: p50 / p99 | `by_tail` projection: p50 / p99 |
@@ -166,7 +166,7 @@ The same test on the AWS m7i.2xlarge with the projection, run on the server itse
 91.9 queries a second: p50 / p99 of 12 ms / 44 ms for up to a week, and 169 ms / 869 ms
 for 1 to 10 years.
 
-At a steady 20 queries a second, about half what xraytunnel manages flat out, it keeps up
+At a steady 20 queries a second, about half what the i5-6500 manages flat out, it keeps up
 easily: 13 ms / 28 ms for up to a week, 117 ms / 631 ms for 1 to 10 years, and a p99 of
 489 ms overall, against 1.4 s when it is saturated. The AWS m7i.2xlarge, running the test on
 the server itself, does the same with less latency: 8 ms / 17 ms for up to a week, 90 ms /
@@ -177,7 +177,7 @@ improve.
 At 30 queries a second it is barely different: 13 ms / 34 ms for up to a week, 124 ms /
 658 ms for 1 to 10 years, and a p99 of 546 ms overall.
 
-At 40 queries a second, just under what xraytunnel manages flat out, it still completes
+At 40 queries a second, just under what the i5-6500 manages flat out, it still completes
 every query on schedule on average, but there is no headroom. The p50 holds at 30 ms
 overall, while the p99 jumps to 4.1 s; even queries for up to a week see 2.6 s. When a
 few long ranges arrive together, they probably hold up the queries behind them.
