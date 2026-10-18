@@ -20,3 +20,14 @@ clickhouse.database=faa
 # localhost but Grafana runs on another machine.
 #grafana.clickhouse.host=clickhouse-host
 #grafana.clickhouse.port=9000
+
+# OpenTelemetry, optional: send the Java loader's traces, metrics and logs to an OTLP/HTTP
+# collector such as ClickStack's (environment variables OTEL_EXPORTER_OTLP_ENDPOINT /
+# OTEL_KEY / OTEL_SERVICE_NAME / OTEL_ENABLED override these). Unset, the loader runs
+# without the agent, as it does when the collector is not answering.
+#otel.endpoint=http://localhost:4318
+# ClickStack ingestion API key (HyperDX: Team Settings > API Keys).
+#otel.key=
+#otel.service.name=faa-loader
+# false: never use the agent, even with otel.endpoint set.
+#otel.enabled=true

@@ -198,6 +198,29 @@ few long ranges arrive together, they probably hold up the queries behind them.
   0`, as the benchmark and the Aircraft Reliability dashboard do. To check a query, run
   `EXPLAIN` on it and look for `ReadFromMergeTree (by_tail)`.
 
+## OpenTelemetry
+
+The Java loader (used by `load-flights.sh`, `load-weather.sh` and `bench-queries.sh`) can
+run with the [OpenTelemetry Java agent](https://clickhouse.com/docs/clickstack/ingesting-data/sdks/java)
+and send its traces, metrics and logs to an OTLP collector such as a local
+[ClickStack](https://clickhouse.com/docs/clickstack). Traces include a span for every query
+to ClickHouse, with its SQL. Add to `clickhouse.properties`:
+
+    otel.endpoint=http://localhost:4318
+    otel.key=<ingestion API key, from HyperDX: Team Settings > API Keys>
+
+The agent is downloaded to `target/otel/` on first use. The service is called
+`faa-loader` (set `otel.service.name` to change it), and the `faa.command` resource
+attribute says which subcommand ran (`load` or `bench`). The log lines for each file
+loaded and each benchmark's summary carry their figures as attributes (`faa.table`,
+`faa.rows`, `faa.seconds`, `faa.qps`...), so they can be charted in HyperDX.
+
+ClickStack is never required. Without `otel.endpoint` the loader runs without the agent;
+`OTEL_ENABLED=false` (or `otel.enabled=false`) turns it off for a run, and if nothing
+answers at the endpoint the scripts say so and carry on without it:
+
+    OTEL_ENABLED=false scripts/load-flights.sh
+
 ## Data mirror
 
 The original sources are slow (IEM weather alone takes about 10 hours at one request at a

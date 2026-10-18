@@ -67,6 +67,44 @@ ensure_loader() {  # builds the loader if it is missing or older than its source
   fi
 }
 
+# OpenTelemetry: when otel.endpoint (or OTEL_EXPORTER_OTLP_ENDPOINT) is set, the
+# loader runs with the OpenTelemetry Java agent, downloaded on first use, and sends
+# traces and metrics there, e.g. to a ClickStack collector on port 4318. otel.key
+# is the ingestion API key (HyperDX: Team Settings > API Keys). OTEL_ENABLED=false
+# (or otel.enabled=false) turns it off; so does a collector that isn't answering.
+OTEL_AGENT_VERSION=2.32.0
+OTEL_AGENT_JAR="$PROJECT_DIR/target/otel/opentelemetry-javaagent-$OTEL_AGENT_VERSION.jar"
+OTEL_ENDPOINT="${OTEL_EXPORTER_OTLP_ENDPOINT:-$(prop otel.endpoint)}"
+OTEL_KEY="${OTEL_KEY:-$(prop otel.key)}"
+OTEL_SERVICE="${OTEL_SERVICE_NAME:-$(prop otel.service.name)}"; OTEL_SERVICE="${OTEL_SERVICE:-faa-loader}"
+OTEL_ON="${OTEL_ENABLED:-$(prop otel.enabled)}"; OTEL_ON="${OTEL_ON:-true}"
+
+# run_loader ARGS...: runs the Java loader, with the agent if OpenTelemetry is set up.
+# The subcommand (load, bench...) goes in the faa.command resource attribute.
+run_loader() {
+  if [[ -z "$OTEL_ENDPOINT" || "$OTEL_ON" == false ]]; then
+    java -jar "$LOADER_JAR" "$@"
+    return
+  fi
+  # Any HTTP answer, even 401 or 404, means the collector is up.
+  if [[ "$(curl -s -o /dev/null -m 2 -w '%{http_code}' "$OTEL_ENDPOINT" || true)" == 000 ]]; then
+    echo "warn: no OpenTelemetry collector at $OTEL_ENDPOINT; running without it" >&2
+    java -jar "$LOADER_JAR" "$@"
+    return
+  fi
+  [[ -f "$OTEL_AGENT_JAR" ]] || download \
+    "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v$OTEL_AGENT_VERSION/opentelemetry-javaagent.jar" \
+    "$OTEL_AGENT_JAR"
+  OTEL_EXPORTER_OTLP_ENDPOINT="$OTEL_ENDPOINT" \
+  OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf \
+  OTEL_EXPORTER_OTLP_HEADERS="${OTEL_EXPORTER_OTLP_HEADERS:-${OTEL_KEY:+authorization=$OTEL_KEY}}" \
+  OTEL_LOGS_EXPORTER=otlp \
+  OTEL_INSTRUMENTATION_COMMON_LOGGING_STRUCTURED_ATTRIBUTES_INCLUDED=faa.source,faa.table,faa.rows,faa.seconds,faa.queries,faa.errors,faa.qps \
+  OTEL_SERVICE_NAME="$OTEL_SERVICE" \
+  OTEL_RESOURCE_ATTRIBUTES="faa.command=$1${OTEL_RESOURCE_ATTRIBUTES:+,$OTEL_RESOURCE_ATTRIBUTES}" \
+    java -javaagent:"$OTEL_AGENT_JAR" -jar "$LOADER_JAR" "$@"
+}
+
 # Polite downloader: retries, resumes, and only renames into place when complete.
 download() {
   local url="$1" target="$2"

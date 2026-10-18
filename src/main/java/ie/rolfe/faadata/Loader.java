@@ -48,6 +48,8 @@ import com.clickhouse.client.api.DataStreamWriter;
 import com.clickhouse.client.api.insert.InsertResponse;
 import com.clickhouse.client.api.insert.InsertSettings;
 import com.clickhouse.data.ClickHouseFormat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Command-line entry point.
@@ -72,6 +74,7 @@ import com.clickhouse.data.ClickHouseFormat;
  */
 public class Loader {
 
+    private static final Logger LOG = LoggerFactory.getLogger(Loader.class);
     private static final long TIMEOUT_MINUTES = 60;
 
     public static void main(String[] args) throws Exception {
@@ -110,8 +113,8 @@ public class Loader {
 
     private static void ping(Client client, ClickHouseConfig config) throws Exception {
         var records = client.queryAll("SELECT version()");
-        System.out.println("Connected to " + config.endpoint() + " as " + config.user()
-                + ", ClickHouse " + records.get(0).getString(1));
+        LOG.info("Connected to {} as {}, ClickHouse {}", config.endpoint(), config.user(),
+                records.get(0).getString(1));
     }
 
     private static void schema(Client client, List<String> files) throws Exception {
@@ -119,7 +122,7 @@ public class Loader {
             for (String stmt : Files.readString(Path.of(file)).split(";")) {
                 String sql = stripComments(stmt).strip();
                 if (!sql.isEmpty()) {
-                    System.out.println("Executing: " + sql.lines().findFirst().orElse(""));
+                    LOG.info("Executing: {}", sql.lines().findFirst().orElse(""));
                     client.execute(sql).get(TIMEOUT_MINUTES, TimeUnit.MINUTES).close();
                 }
             }
@@ -164,10 +167,9 @@ public class Loader {
                 long start = System.nanoTime();
                 long rows = insert(client, table, new ConcatenatedCsv(files), settings);
                 totalRows += rows;
-                System.out.printf("%s (%,d files) -> %s: %,d rows in %.1fs%n",
-                        path, files.size(), table, rows, (System.nanoTime() - start) / 1e9);
+                logLoaded(path + " (%,d files)".formatted(files.size()), table, rows, start);
             }
-            System.out.printf("Total: %,d rows%n", totalRows);
+            logTotal(table, totalRows);
             return;
         }
         ExecutorService pool = Executors.newFixedThreadPool(jobs);
@@ -177,8 +179,7 @@ public class Loader {
                 results.add(pool.submit(() -> {
                     long start = System.nanoTime();
                     long rows = loadFile(client, table, file, settings, types);
-                    System.out.printf("%s -> %s: %,d rows in %.1fs%n",
-                            file, table, rows, (System.nanoTime() - start) / 1e9);
+                    logLoaded(file.toString(), table, rows, start);
                     return rows;
                 }));
             }
@@ -192,7 +193,20 @@ public class Loader {
         } finally {
             pool.shutdownNow();
         }
-        System.out.printf("Total: %,d rows%n", totalRows);
+        logTotal(table, totalRows);
+    }
+
+    /** Logs one finished insert; the key-value pairs become attributes when exported to OpenTelemetry. */
+    private static void logLoaded(String source, String table, long rows, long startNanos) {
+        double seconds = (System.nanoTime() - startNanos) / 1e9;
+        LOG.atInfo().addKeyValue("faa.source", source).addKeyValue("faa.table", table)
+                .addKeyValue("faa.rows", rows).addKeyValue("faa.seconds", seconds)
+                .log("%s -> %s: %,d rows in %.1fs".formatted(source, table, rows, seconds));
+    }
+
+    private static void logTotal(String table, long rows) {
+        LOG.atInfo().addKeyValue("faa.table", table).addKeyValue("faa.rows", rows)
+                .log("Total: %,d rows".formatted(rows));
     }
 
     /** The columns of {@code table} an insert can set (not ALIAS or MATERIALIZED): name to type. */

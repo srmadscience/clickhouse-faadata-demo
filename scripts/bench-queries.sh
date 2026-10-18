@@ -48,4 +48,4 @@ fi
 [[ $# -ge 1 ]] || { sed -n '/^# Query performance/,/^set -e/p' "$0" | sed '$d; s/^# \{0,1\}//' >&2; exit 1; }
 
 ensure_loader
-java -jar "$LOADER_JAR" bench "$@" ${record[@]+"${record[@]}"}
+run_loader bench "$@" ${record[@]+"${record[@]}"}

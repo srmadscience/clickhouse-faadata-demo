@@ -40,6 +40,8 @@ import java.util.function.Function;
 import com.clickhouse.client.api.Client;
 import com.clickhouse.client.api.data_formats.ClickHouseBinaryFormatReader;
 import com.clickhouse.client.api.query.QueryResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Query performance test: issues randomly generated queries asynchronously and
@@ -71,6 +73,7 @@ public final class QueryBench {
         Query next(Random random);
     }
 
+    private static final Logger LOG = LoggerFactory.getLogger(QueryBench.class);
     private static final Map<String, Function<Client, Workload>> WORKLOADS = Map.of(
             "flight-history", FlightHistory::new);
 
@@ -111,7 +114,7 @@ public final class QueryBench {
             var range = client.queryAll("SELECT min(FlightDate), max(FlightDate) FROM faa.tail_day").get(0);
             first = range.getLocalDate(1);
             last = range.getLocalDate(2);
-            System.out.printf("flight-history: %,d aircraft, flights %s to %s%n", tails.size(), first, last);
+            LOG.info("flight-history: %,d aircraft, flights %s to %s".formatted(tails.size(), first, last));
         }
 
         FlightHistory(List<String> tails, LocalDate first, LocalDate last) {
@@ -187,8 +190,8 @@ public final class QueryBench {
         Workload workload = WORKLOADS.get(workloadName).apply(client);
         String version = client.queryAll("SELECT version()").get(0).getString(1);
         String runStart = ZonedDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssZ"));
-        System.out.printf("%s for %d s, %s, %d threads, seed %d%n", workloadName, duration,
-                rate > 0 ? rate + " queries/s" : "back to back", threads, seed);
+        LOG.info("%s for %d s, %s, %d threads, seed %d".formatted(workloadName, duration,
+                rate > 0 ? rate + " queries/s" : "back to back", threads, seed));
 
         List<Result> done = rate > 0
                 ? openLoop(client, workload, new Random(seed), rate, threads, duration)
@@ -233,7 +236,7 @@ public final class QueryBench {
         }
         pool.shutdown();
         if (!pool.awaitTermination(10, TimeUnit.MINUTES)) {
-            System.err.println("warn: queries still running after 10 minutes; leaving them");
+            LOG.warn("queries still running after 10 minutes; leaving them");
         }
         return new ArrayList<>(done);
     }
@@ -284,7 +287,7 @@ public final class QueryBench {
                         r.error() == null ? "" : "\"" + r.error().replace("\"", "\"\"").replace('\n', ' ') + "\"");
             }
         }
-        System.out.println("Per-query log: " + log);
+        LOG.info("Per-query log: {}", log);
     }
 
     /**
@@ -295,9 +298,12 @@ public final class QueryBench {
         List<Result> ok = done.stream().filter(r -> r.error() == null).toList();
         long errors = done.size() - ok.size();
         done.stream().filter(r -> r.error() != null).limit(5)
-                .forEach(r -> System.err.println("error: " + r.query().description().replace(',', ' ') + ": " + r.error()));
-        System.out.printf("%n%,d queries, %,d errors, %.1f queries/s%n", done.size(), errors,
-                ok.size() / (double) duration);
+                .forEach(r -> LOG.error("{}: {}", r.query().description().replace(',', ' '), r.error()));
+        double qps = ok.size() / (double) duration;
+        System.out.println();
+        LOG.atInfo().addKeyValue("faa.queries", done.size()).addKeyValue("faa.errors", errors)
+                .addKeyValue("faa.qps", qps)
+                .log("%,d queries, %,d errors, %.1f queries/s".formatted(done.size(), errors, qps));
         System.out.printf("%-16s %7s %9s %9s %9s %9s %11s%n",
                 "range", "queries", "p50 ms", "p90 ms", "p99 ms", "max ms", "rows/query");
         long[][] buckets = {{1, 7}, {8, 31}, {32, 365}, {366, Long.MAX_VALUE}};

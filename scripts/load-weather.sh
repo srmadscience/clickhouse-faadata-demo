@@ -31,6 +31,6 @@ paths=("$@")
 [[ -e "${paths[0]}" ]] || { echo "No weather files found; run fetch-weather.sh first." >&2; exit 1; }
 
 # IEM timestamps are "YYYY-MM-DD hh:mm" (no seconds), hence best_effort parsing.
-java -jar "$LOADER_JAR" load faa.weather --set date_time_input_format=best_effort --combine "${paths[@]}"
+run_loader load faa.weather --set date_time_input_format=best_effort --combine "${paths[@]}"
 
 ch_query "SELECT toYear(valid) AS year, uniqExact(station) AS stations, count() AS observations FROM faa.weather GROUP BY year ORDER BY year FORMAT PrettyCompact"

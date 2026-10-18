@@ -36,6 +36,6 @@ done
 # --binary parses the CSV here and sends ClickHouse ready-made columns, which
 # costs the server about a tenth of the CPU of parsing CSV itself; the loader
 # then becomes the bottleneck, so it loads LOAD_JOBS (default 8) files at a time.
-java -jar "$LOADER_JAR" load faa.ontime --binary --jobs "${LOAD_JOBS:-8}" "${files[@]}"
+run_loader load faa.ontime --binary --jobs "${LOAD_JOBS:-8}" "${files[@]}"
 
 ch_query "SELECT toYYYYMM(FlightDate) AS month, count() AS flights FROM faa.ontime GROUP BY month ORDER BY month FORMAT PrettyCompact"
