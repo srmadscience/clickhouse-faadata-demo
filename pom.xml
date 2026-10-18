@@ -33,6 +33,8 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <clickhouse.version>0.10.0</clickhouse.version>
         <logback.version>1.5.18</logback.version>
+        <!-- No newer than the OpenTelemetry Java agent (scripts/lib.sh) supports -->
+        <opentelemetry.version>1.65.0</opentelemetry.version>
         <junit.version>5.11.4</junit.version>
     </properties>
 
@@ -48,6 +50,12 @@
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
             <version>${logback.version}</version>
+        </dependency>
+        <!-- Spans grouping each run; no-ops unless the OpenTelemetry agent is attached -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-api</artifactId>
+            <version>${opentelemetry.version}</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

@@ -40,6 +40,8 @@ import java.util.function.Function;
 import com.clickhouse.client.api.Client;
 import com.clickhouse.client.api.data_formats.ClickHouseBinaryFormatReader;
 import com.clickhouse.client.api.query.QueryResponse;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Context;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -192,6 +194,8 @@ public final class QueryBench {
         String runStart = ZonedDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssZ"));
         LOG.info("%s for %d s, %s, %d threads, seed %d".formatted(workloadName, duration,
                 rate > 0 ? rate + " queries/s" : "back to back", threads, seed));
+        Span.current().setAttribute("faa.threads", threads).setAttribute("faa.rate", rate)
+                .setAttribute("faa.duration", duration).setAttribute("faa.seed", seed);
 
         List<Result> done = rate > 0
                 ? openLoop(client, workload, new Random(seed), rate, threads, duration)
@@ -232,7 +236,8 @@ public final class QueryBench {
             }
             Query query = workload.next(random);
             long dueAt = due;
-            pool.execute(() -> done.add(run(client, query, start, dueAt)));
+            // Context.wrap makes each query's spans children of the run's span.
+            pool.execute(Context.current().wrap(() -> { done.add(run(client, query, start, dueAt)); }));
         }
         pool.shutdown();
         if (!pool.awaitTermination(10, TimeUnit.MINUTES)) {
@@ -250,11 +255,11 @@ public final class QueryBench {
         List<Thread> workers = new ArrayList<>();
         for (int t = 0; t < threads; t++) {
             Random random = new Random(seed + t);
-            workers.add(Thread.ofPlatform().start(() -> {
+            workers.add(Thread.ofPlatform().start(Context.current().wrap(() -> {
                 while (System.nanoTime() < end) {
                     done.add(run(client, workload.next(random), start, System.nanoTime()));
                 }
-            }));
+            })));
         }
         for (Thread w : workers) {
             w.join();
@@ -300,6 +305,8 @@ public final class QueryBench {
         done.stream().filter(r -> r.error() != null).limit(5)
                 .forEach(r -> LOG.error("{}: {}", r.query().description().replace(',', ' '), r.error()));
         double qps = ok.size() / (double) duration;
+        Span.current().setAttribute("faa.queries", done.size()).setAttribute("faa.errors", errors)
+                .setAttribute("faa.qps", qps);
         System.out.println();
         LOG.atInfo().addKeyValue("faa.queries", done.size()).addKeyValue("faa.errors", errors)
                 .addKeyValue("faa.qps", qps)

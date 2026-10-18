@@ -48,6 +48,7 @@ import com.clickhouse.client.api.DataStreamWriter;
 import com.clickhouse.client.api.insert.InsertResponse;
 import com.clickhouse.client.api.insert.InsertSettings;
 import com.clickhouse.data.ClickHouseFormat;
+import io.opentelemetry.context.Context;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,6 +84,16 @@ public class Loader {
             return;
         }
         ClickHouseConfig config = ClickHouseConfig.load();
+        // One span for the run, named after the command and its table or workload
+        // ("load faa.ontime", "bench flight-history"), so each run is one trace.
+        String name = args[0] + (args.length > 1 && !args[0].equals("schema") ? " " + args[1] : "");
+        Tracing.inSpan(name, span -> {
+            run(config, args);
+            return null;
+        });
+    }
+
+    private static void run(ClickHouseConfig config, String[] args) throws Exception {
         if (args[0].equals("bench")) {
             QueryBench.run(config, List.of(args).subList(1, args.length));
             return;
@@ -164,10 +175,8 @@ public class Loader {
         if (combine) {
             for (String path : paths) {
                 List<Path> files = expand(List.of(path));
-                long start = System.nanoTime();
-                long rows = insert(client, table, new ConcatenatedCsv(files), settings);
-                totalRows += rows;
-                logLoaded(path + " (%,d files)".formatted(files.size()), table, rows, start);
+                totalRows += loadTraced(path + " (%,d files)".formatted(files.size()), table,
+                        () -> insert(client, table, new ConcatenatedCsv(files), settings));
             }
             logTotal(table, totalRows);
             return;
@@ -176,12 +185,9 @@ public class Loader {
         try {
             List<Future<Long>> results = new ArrayList<>();
             for (Path file : expand(paths)) {
-                results.add(pool.submit(() -> {
-                    long start = System.nanoTime();
-                    long rows = loadFile(client, table, file, settings, types);
-                    logLoaded(file.toString(), table, rows, start);
-                    return rows;
-                }));
+                // Context.wrap carries the run's span to the pool thread, so the file's span is its child.
+                results.add(pool.submit(Context.current().wrap(() ->
+                        loadTraced(file.toString(), table, () -> loadFile(client, table, file, settings, types)))));
             }
             for (Future<Long> result : results) {
                 try {
@@ -196,9 +202,25 @@ public class Loader {
         logTotal(table, totalRows);
     }
 
+    interface Insert {
+        long run() throws Exception;
+    }
+
+    /** Runs one insert in its own span ("load file") and logs it. */
+    private static long loadTraced(String source, String table, Insert insert) throws Exception {
+        return Tracing.inSpan("load file", span -> {
+            span.setAttribute("faa.source", source);
+            span.setAttribute("faa.table", table);
+            long start = System.nanoTime();
+            long rows = insert.run();
+            span.setAttribute("faa.rows", rows);
+            logLoaded(source, table, rows, (System.nanoTime() - start) / 1e9);
+            return rows;
+        });
+    }
+
     /** Logs one finished insert; the key-value pairs become attributes when exported to OpenTelemetry. */
-    private static void logLoaded(String source, String table, long rows, long startNanos) {
-        double seconds = (System.nanoTime() - startNanos) / 1e9;
+    private static void logLoaded(String source, String table, long rows, double seconds) {
         LOG.atInfo().addKeyValue("faa.source", source).addKeyValue("faa.table", table)
                 .addKeyValue("faa.rows", rows).addKeyValue("faa.seconds", seconds)
                 .log("%s -> %s: %,d rows in %.1fs".formatted(source, table, rows, seconds));

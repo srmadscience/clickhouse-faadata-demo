@@ -203,8 +203,11 @@ few long ranges arrive together, they probably hold up the queries behind them.
 The Java loader (used by `load-flights.sh`, `load-weather.sh` and `bench-queries.sh`) can
 run with the [OpenTelemetry Java agent](https://clickhouse.com/docs/clickstack/ingesting-data/sdks/java)
 and send its traces, metrics and logs to an OTLP collector such as a local
-[ClickStack](https://clickhouse.com/docs/clickstack). Traces include a span for every query
-to ClickHouse, with its SQL. Add to `clickhouse.properties`:
+[ClickStack](https://clickhouse.com/docs/clickstack). Each run is one trace, named after
+the command (`load faa.ontime`, `bench flight-history`). A load has a `load file` span per
+file, with its rows, and the insert's HTTP request under it; a benchmark has every query,
+with its SQL, under the run's span, which records the queries, errors and queries a second.
+Add to `clickhouse.properties`:
 
     otel.endpoint=http://localhost:4318
     otel.key=<ingestion API key, from HyperDX: Team Settings > API Keys>
