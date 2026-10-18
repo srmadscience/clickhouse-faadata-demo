@@ -57,7 +57,7 @@ import org.slf4j.LoggerFactory;
  *
  * <pre>
  *   ping                          check connectivity and print the server version
- *   schema &lt;file.sql&gt;...          run ';'-separated DDL statements
+ *   sql &lt;label&gt;                   run the statements a build script pipes in (see {@link SqlScript})
  *   load &lt;table&gt; [--set k=v]... [--combine | --binary] [--jobs N] &lt;path&gt;...
  *                                 stream CSV files (plain, .gz or .zip) into a table,
  *                                 applying ClickHouse settings to each insert
@@ -85,8 +85,8 @@ public class Loader {
         }
         ClickHouseConfig config = ClickHouseConfig.load();
         // One span for the run, named after the command and its table or workload
-        // ("load faa.ontime", "bench flight-history"), so each run is one trace.
-        String name = args[0] + (args.length > 1 && !args[0].equals("schema") ? " " + args[1] : "");
+        // ("load faa.ontime", "bench flight-history", "sql build-tail-day"), so each run is one trace.
+        String name = args[0] + (args.length > 1 ? " " + args[1] : "");
         Tracing.inSpan(name, span -> {
             run(config, args);
             return null;
@@ -101,7 +101,7 @@ public class Loader {
         try (Client client = config.newClient()) {
             switch (args[0]) {
                 case "ping" -> ping(client, config);
-                case "schema" -> schema(client, List.of(args).subList(1, args.length));
+                case "sql" -> SqlScript.run(client, System.in);
                 case "load" -> {
                     if (args.length < 3) {
                         usage();
@@ -118,7 +118,7 @@ public class Loader {
     }
 
     private static void usage() {
-        System.err.println("usage: Loader ping | schema <file.sql>... | load <table> [--set k=v]... [--combine | --binary] [--jobs N] <file-or-dir>...\n"
+        System.err.println("usage: Loader ping | sql <label> | load <table> [--set k=v]... [--combine | --binary] [--jobs N] <file-or-dir>...\n"
                 + "     | bench flight-history [--rate Q] [--threads N] [--duration S] [--timeout S] [--seed N] [--log file.csv]");
     }
 
@@ -126,22 +126,6 @@ public class Loader {
         var records = client.queryAll("SELECT version()");
         LOG.info("Connected to {} as {}, ClickHouse {}", config.endpoint(), config.user(),
                 records.get(0).getString(1));
-    }
-
-    private static void schema(Client client, List<String> files) throws Exception {
-        for (String file : files) {
-            for (String stmt : Files.readString(Path.of(file)).split(";")) {
-                String sql = stripComments(stmt).strip();
-                if (!sql.isEmpty()) {
-                    LOG.info("Executing: {}", sql.lines().findFirst().orElse(""));
-                    client.execute(sql).get(TIMEOUT_MINUTES, TimeUnit.MINUTES).close();
-                }
-            }
-        }
-    }
-
-    private static String stripComments(String sql) {
-        return sql.lines().filter(l -> !l.strip().startsWith("--")).reduce("", (a, b) -> a + b + "\n");
     }
 
     private static void load(Client client, String table, List<String> args) throws Exception {

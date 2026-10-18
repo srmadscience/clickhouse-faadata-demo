@@ -22,6 +22,7 @@
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 ch_check_connection
+ensure_loader
 
 months=("$@")
 [[ ${#months[@]} -gt 0 ]] || months=($(ch_query "SELECT DISTINCT toYYYYMM(FlightDate) FROM faa.ontime ORDER BY 1"))
@@ -78,9 +79,12 @@ obs() {  # obs ALIAS PREFIX SCHED_COL
         if($fresh, $1.wx, '') AS ${2}_wx"
 }
 
+# The statements run in the Java loader, as one trace with a span per month.
+{
 for m in "${months[@]}"; do
-  ch_query "ALTER TABLE faa.flight_weather DROP PARTITION $m"
-  ch_query "
+  sql_span "build month" "faa.table=faa.flight_weather" "faa.month=$m"
+  sql_stmt "ALTER TABLE faa.flight_weather DROP PARTITION $m"
+  sql_stmt "
     INSERT INTO faa.flight_weather
     SELECT f.FlightDate, f.Reporting_Airline, f.tail, f.Origin, f.Dest, f.CRSDepTime,
            f.sched_dep_utc, f.sched_arr_utc, f.DepDelay, f.DepDel15, f.ArrDelay, f.ArrDel15,
@@ -102,12 +106,14 @@ for m in "${months[@]}"; do
     ASOF LEFT JOIN ($(wx "$m")) AS ow ON ow.station = f.o_station AND ow.valid <= f.sched_dep_utc
     ASOF LEFT JOIN ($(wx "$m")) AS dw ON dw.station = f.d_station AND dw.valid <= f.sched_arr_utc
     SETTINGS join_use_nulls = 0"
-  echo "$m: $(ch_query "SELECT count() FROM faa.flight_weather WHERE toYYYYMM(FlightDate) = $m") flights"
+  sql_stmt "SELECT concat('$m: ', toString(count()), ' flights') FROM faa.flight_weather WHERE toYYYYMM(FlightDate) = $m"
 done
 
-ch_query "
+sql_span
+sql_stmt "
   SELECT count() AS flights,
          round(100 * countIf(o_category != '') / flights, 1) AS pct_origin_wx,
          round(100 * countIf(d_category != '') / flights, 1) AS pct_dest_wx,
          (SELECT count() FROM faa.ontime) AS ontime_flights
   FROM faa.flight_weather FORMAT PrettyCompact"
+} | run_sql_script build-flight-weather

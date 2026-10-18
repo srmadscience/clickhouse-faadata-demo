@@ -35,7 +35,7 @@ are never loaded, and owner names only for organisations, not individuals.
 
 ## Layout
 
-    src/main/java/...      Loader: ping | schema | load (streams CSV / .gz / .zip) | bench (query timing)
+    src/main/java/...      Loader: ping | load (streams CSV / .gz / .zip) | sql (runs build scripts' SQL) | bench (query timing)
     sql/                   Table definitions, run in file-name order
     scripts/               Everything needed to rebuild the database and Grafana (below)
     aws/                   CloudFormation template for a complete demo server (below)
@@ -200,13 +200,17 @@ few long ranges arrive together, they probably hold up the queries behind them.
 
 ## OpenTelemetry
 
-The Java loader (used by `load-flights.sh`, `load-weather.sh` and `bench-queries.sh`) can
+The Java loader, which runs `load-flights.sh`, `load-weather.sh`, `bench-queries.sh` and
+the SQL of `create-database.sh`, `build-tail-day.sh` and `build-flight-weather.sh`, can
 run with the [OpenTelemetry Java agent](https://clickhouse.com/docs/clickstack/ingesting-data/sdks/java)
 and send its traces, metrics and logs to an OTLP collector such as a local
 [ClickStack](https://clickhouse.com/docs/clickstack). Each run is one trace, named after
-the command (`load faa.ontime`, `bench flight-history`). A load has a `load file` span per
-file, with its rows, and the insert's HTTP request under it; a benchmark has every query,
-with its SQL, under the run's span, which records the queries, errors and queries a second.
+the command (`load faa.ontime`, `bench flight-history`, `sql build-tail-day`). A load has a
+`load file` span per file, with its rows, and the insert's HTTP request under it; a build
+has a `build month` span per month (`sql file` per file for `create-database.sh`) with its
+statements under it; a benchmark has every query, with its SQL, under the run's span, which
+records the queries, errors and queries a second. `load-stations.sh`, `load-registry.sh`
+and the fetch scripts still use `curl`, so they are not traced.
 Add to `clickhouse.properties`:
 
     otel.endpoint=http://localhost:4318

@@ -105,6 +105,14 @@ run_loader() {
     java -javaagent:"$OTEL_AGENT_JAR" -jar "$LOADER_JAR" "$@"
 }
 
+# The build scripts generate their SQL with these and pipe it to run_sql_script,
+# which runs it in the Java loader, so each script's run is one trace (see
+# SqlScript.java). Each writes one NUL-terminated record.
+sql_stmt() { printf '%s\0' "$1"; }                            # sql_stmt SQL: run SQL, print its result
+sql_span() { local IFS=$'\t'; printf -- '--span %s\0' "$*"; } # sql_span NAME [KEY=VALUE]...: span what follows; no NAME ends it
+sql_log() { printf -- '--log %s\0' "$1"; }                    # sql_log TEXT: print TEXT
+run_sql_script() { run_loader sql "$1"; }                     # run_sql_script LABEL < records
+
 # Polite downloader: retries, resumes, and only renames into place when complete.
 download() {
   local url="$1" target="$2"

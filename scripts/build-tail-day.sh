@@ -21,13 +21,17 @@
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 ch_check_connection
+ensure_loader
 
 months=("$@")
 [[ ${#months[@]} -gt 0 ]] || months=($(ch_query "SELECT DISTINCT toYYYYMM(FlightDate) FROM faa.ontime ORDER BY 1"))
 
+# The statements run in the Java loader, as one trace with a span per month.
+{
 for m in "${months[@]}"; do
-  ch_query "ALTER TABLE faa.tail_day DROP PARTITION $m"
-  ch_query "
+  sql_span "build month" "faa.table=faa.tail_day" "faa.month=$m"
+  sql_stmt "ALTER TABLE faa.tail_day DROP PARTITION $m"
+  sql_stmt "
     INSERT INTO faa.tail_day
     SELECT FlightDate, Reporting_Airline, tail,
            count(), countIf(Cancelled = 0),
@@ -40,7 +44,9 @@ for m in "${months[@]}"; do
     GROUP BY FlightDate, Reporting_Airline, tail"
 done
 
-ch_query "
+sql_span
+sql_stmt "
   SELECT (SELECT count() FROM faa.ontime) AS ontime_flights,
          sum(flights) AS tail_day_flights, count() AS tail_day_rows
   FROM faa.tail_day FORMAT PrettyCompact"
+} | run_sql_script build-tail-day
