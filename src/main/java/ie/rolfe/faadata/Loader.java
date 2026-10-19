@@ -98,7 +98,11 @@ public class Loader {
             QueryBench.run(config, List.of(args).subList(1, args.length));
             return;
         }
-        try (Client client = config.newClient()) {
+        // SQL scripts name their tables in full and may create the database
+        // itself, so they connect to "default", which always exists.
+        try (Client client = args[0].equals("sql")
+                ? config.clientBuilder().setDefaultDatabase("default").build()
+                : config.newClient()) {
             switch (args[0]) {
                 case "ping" -> ping(client, config);
                 case "sql" -> SqlScript.run(client, System.in);
