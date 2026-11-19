@@ -10,6 +10,12 @@ Developed with ClickHouse 26.9 and Grafana 13. The ten years of data from 2016 t
 
 ![Flight Delays dashboard, February to July 2026](docs/screenshots/flight-delays.jpg)
 
+## See Also:
+
+* [bigquery-faadata-demo](https://github.com/srmadscience/bigquery-faadata-demo) Google BigQuery port
+* [databricks-faadata-demo](https://github.com/srmadscience/databricks-faadata-demo) Databricks port
+* [snowflake-faadata-demo](https://github.com/srmadscience/snowflake-faadata-demo) Snowflake port
+
 ## Data
 
 | Table | Source | Grain |
